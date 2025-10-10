@@ -1,0 +1,10 @@
+pyproject.toml
+src/agent.py
+src/app.py
+src/bot.py
+src/config.py
+src/frontend_py.egg-info/PKG-INFO
+src/frontend_py.egg-info/SOURCES.txt
+src/frontend_py.egg-info/dependency_links.txt
+src/frontend_py.egg-info/requires.txt
+src/frontend_py.egg-info/top_level.txt

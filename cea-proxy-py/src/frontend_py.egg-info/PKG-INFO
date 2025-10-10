@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: frontend-py
+Version: 0.1.0
+Requires-Python: >=3.13
+Requires-Dist: aiohttp>=3.12.15
+Requires-Dist: microsoft-agents-activity>=0.1.2
+Requires-Dist: microsoft-agents-authentication-msal>=0.1.2
+Requires-Dist: microsoft-agents-hosting-aiohttp>=0.1.2
+Requires-Dist: microsoft-agents-hosting-core>=0.1.2
