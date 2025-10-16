@@ -1,6 +1,0 @@
-resource_group_name_resources = "rg-m365-agents"
-subnet_id_agent               = "/subscriptions/0ec6c427-01d3-4462-ae56-fd9656157157/resourceGroups/rg-m365-agents/providers/Microsoft.Network/virtualNetworks/vnet-m365-agents/subnets/ai-foundry"
-subnet_id_private_endpoint    = "/subscriptions/0ec6c427-01d3-4462-ae56-fd9656157157/resourceGroups/rg-m365-agents/providers/Microsoft.Network/virtualNetworks/vnet-m365-agents/subnets/private-endpoints"
-subscription_id_resources     = "0ec6c427-01d3-4462-ae56-fd9656157157"
-subscription_id_infra         = "0ec6c427-01d3-4462-ae56-fd9656157157"
-location                      = "westus"

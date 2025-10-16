@@ -1,0 +1,29 @@
+variable "unique_suffix" {
+  description = "Unique suffix for resource naming"
+  type        = string
+}
+
+variable "resource_group_name" {
+  description = "Resource group name for Logic Apps resources"
+  type        = string
+}
+
+variable "location" {
+  description = "Azure region for resources"
+  type        = string
+}
+
+variable "subnet_id_logic_apps" {
+  description = "Subnet ID for Logic Apps VNet integration"
+  type        = string
+}
+
+variable "subnet_id_private_endpoint" {
+  description = "Subnet ID for private endpoints"
+  type        = string
+}
+
+variable "log_analytics_workspace_id" {
+  description = "Log Analytics Workspace resource ID for diagnostics"
+  type        = string
+}

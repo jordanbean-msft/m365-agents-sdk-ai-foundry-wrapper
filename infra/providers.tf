@@ -1,5 +1,6 @@
 # Setup providers
 provider "azapi" {
+  subscription_id = var.subscription_id_resources
 }
 
 provider "azapi" {
@@ -7,12 +8,8 @@ provider "azapi" {
   subscription_id = var.subscription_id_resources
 }
 
-provider "azapi" {
-  alias           = "infra_subscription"
-  subscription_id = var.subscription_id_infra
-}
-
 provider "azurerm" {
+  subscription_id = var.subscription_id_resources
   features {}
   storage_use_azuread = true
 }
@@ -20,13 +17,6 @@ provider "azurerm" {
 provider "azurerm" {
   alias           = "workload_subscription"
   subscription_id = var.subscription_id_resources
-  features {}
-  storage_use_azuread = true
-}
-
-provider "azurerm" {
-  alias           = "infra_subscription"
-  subscription_id = var.subscription_id_infra
   features {}
   storage_use_azuread = true
 }

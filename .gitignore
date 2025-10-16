@@ -352,3 +352,11 @@ MigrationBackup/
 .terraform/
 
 .terraform.*
+
+terraform.tfstate
+
+terraform.tfstate.backup
+
+tfplan
+
+terraform.tfvars
