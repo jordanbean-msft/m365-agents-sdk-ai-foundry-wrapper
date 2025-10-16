@@ -1,0 +1,63 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "uv sync",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "sync"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/cea-proxy-py"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "uv sync (allow prerelease)",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "sync",
+        "--prerelease=allow"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/cea-proxy-py"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "uv python install 3.13",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "python",
+        "install",
+        "3.13"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "uv venv create",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "venv",
+        "create"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/cea-proxy-py"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "env prepare",
+      "dependsOn": [
+        "uv python install 3.13",
+        "uv venv create",
+        "uv sync (allow prerelease)"
+      ],
+      "dependsOrder": "sequence"
+    }
+  ]
+}

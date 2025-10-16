@@ -1,9 +1,0 @@
-python-dotenv
-aiohttp
-teams-ai>=1.6.0,<2.0.0
-microsoft-agents-hosting-aiohttp
-microsoft-agents-hosting-core
-microsoft-agents-authentication-msal
-microsoft-agents-activity
-azure-ai-projects
-azure-identity

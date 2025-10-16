@@ -1,4 +1,0 @@
-agent
-app
-bot
-config
