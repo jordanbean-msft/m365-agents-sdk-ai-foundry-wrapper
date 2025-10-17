@@ -17,7 +17,7 @@ This repository provisions a secure, modular Azure infrastructure for AI Foundry
 
 - **Terraform root is `infra/`**. Run all Terraform commands from this directory.
 - **Standard workflow:**
-  1. `terraform fmt`
+  1. `terraform fmt -recursive`
   2. `terraform init`
   3. `terraform validate`
   4. `terraform plan`

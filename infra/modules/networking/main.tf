@@ -21,6 +21,12 @@ resource "azurerm_private_endpoint" "pe_storage" {
     ]
     is_manual_connection = false
   }
+
+  lifecycle {
+    ignore_changes = [
+      private_dns_zone_group
+    ]
+  }
 }
 
 ## Create Private Endpoint for Cosmos DB
@@ -44,6 +50,12 @@ resource "azurerm_private_endpoint" "pe_cosmosdb" {
       "Sql"
     ]
     is_manual_connection = false
+  }
+
+  lifecycle {
+    ignore_changes = [
+      private_dns_zone_group
+    ]
   }
 }
 
@@ -69,6 +81,12 @@ resource "azurerm_private_endpoint" "pe_aisearch" {
     ]
     is_manual_connection = false
   }
+
+  lifecycle {
+    ignore_changes = [
+      private_dns_zone_group
+    ]
+  }
 }
 
 ## Create Private Endpoint for AI Foundry
@@ -92,5 +110,11 @@ resource "azurerm_private_endpoint" "pe_aifoundry" {
       "account"
     ]
     is_manual_connection = false
+  }
+
+  lifecycle {
+    ignore_changes = [
+      private_dns_zone_group
+    ]
   }
 }

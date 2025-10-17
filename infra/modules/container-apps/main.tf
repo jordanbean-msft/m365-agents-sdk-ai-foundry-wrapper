@@ -20,6 +20,12 @@ resource "azurerm_container_app_environment" "main" {
     workload_profile_type = "Consumption"
   }
   tags = var.common_tags
+
+  lifecycle {
+    ignore_changes = [
+      infrastructure_resource_group_name
+    ]
+  }
 }
 
 ## Create Container App with managed identity
@@ -95,7 +101,7 @@ resource "azurerm_container_app" "main" {
     value = var.service_connection_client_secret
   }
 
-  ## Ingress configuration (optional - can be disabled if not needed)
+  ## Ingress configuration
   ingress {
     external_enabled = true
     target_port      = 80

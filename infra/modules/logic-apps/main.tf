@@ -61,7 +61,7 @@ resource "azurerm_logic_app_standard" "logic_app" {
 
   ## App settings
   app_settings = {
-    "FUNCTIONS_WORKER_RUNTIME"     = "node"
+    "FUNCTIONS_WORKER_RUNTIME"     = "dotnet"
     "WEBSITE_NODE_DEFAULT_VERSION" = "~18"
     "WEBSITE_CONTENTOVERVNET"      = "1"
   }
@@ -99,6 +99,12 @@ resource "azurerm_private_endpoint" "pe_logic_apps_storage" {
     is_manual_connection = false
   }
   tags = var.common_tags
+
+  lifecycle {
+    ignore_changes = [
+      private_dns_zone_group
+    ]
+  }
 }
 
 ## Create Private Endpoint for Logic Apps (sites)
@@ -122,6 +128,12 @@ resource "azurerm_private_endpoint" "pe_logic_app" {
     is_manual_connection = false
   }
   tags = var.common_tags
+
+  lifecycle {
+    ignore_changes = [
+      private_dns_zone_group
+    ]
+  }
 }
 
 ## Diagnostic Settings for Logic Apps Storage Account

@@ -1,27 +1,59 @@
-########## Associate Existing Network Security Groups (by ID) to Subnets ##########
+########## Managed Security Rules for Existing Network Security Groups ##########
 
-## NOTE: This module now requires full NSG resource IDs. It does not look up by name.
-## Example NSG ID pattern:
-## /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/networkSecurityGroups/<nsgName>
-
-resource "azurerm_subnet_network_security_group_association" "agent" {
-  subnet_id                 = var.subnet_id_agent
-  network_security_group_id = var.nsg_id_agent
+locals {
+  nsgs = {
+    agent = {
+      id   = var.nsg_id_agent
+      name = element(reverse(split("/", var.nsg_id_agent)), 0)
+    }
+    private_endpoints = {
+      id   = var.nsg_id_private_endpoints
+      name = element(reverse(split("/", var.nsg_id_private_endpoints)), 0)
+    }
+    logic_apps = {
+      id   = var.nsg_id_logic_apps
+      name = element(reverse(split("/", var.nsg_id_logic_apps)), 0)
+    }
+    container_apps = {
+      id   = var.nsg_id_container_apps
+      name = element(reverse(split("/", var.nsg_id_container_apps)), 0)
+    }
+  }
 }
 
-resource "azurerm_subnet_network_security_group_association" "private_endpoints" {
-  subnet_id                 = var.subnet_id_private_endpoint
-  network_security_group_id = var.nsg_id_private_endpoints
-}
+# Allow intra-VNet traffic (broad) so internal service components can communicate.
+# resource "azurerm_network_security_rule" "allow_vnet_inbound" {
+#   for_each                    = local.nsgs
+#   name                        = "allow-vnet-inbound"
+#   priority                    = 100
+#   direction                   = "Inbound"
+#   access                      = "Allow"
+#   protocol                    = "*"
+#   source_port_range           = "*"
+#   destination_port_range      = "*"
+#   source_address_prefix       = "VirtualNetwork"
+#   destination_address_prefix  = "VirtualNetwork"
+#   resource_group_name         = var.resource_group_name
+#   network_security_group_name = each.value.name
+#   description                 = "Allow all intra-VNet traffic"
+# }
 
-resource "azurerm_subnet_network_security_group_association" "logic_apps" {
-  subnet_id                 = var.subnet_id_logic_apps
-  network_security_group_id = var.nsg_id_logic_apps
-}
+# Explicit deny of all other inbound traffic. (Built-in DenyAllInBound exists, but we surface an
+# earlier explicit deny so that any future allow rules must be well‑scoped and prioritized <200.)
+# resource "azurerm_network_security_rule" "deny_all_inbound" {
+#   for_each                    = local.nsgs
+#   name                        = "deny-all-inbound"
+#   priority                    = 200
+#   direction                   = "Inbound"
+#   access                      = "Deny"
+#   protocol                    = "*"
+#   source_port_range           = "*"
+#   destination_port_range      = "*"
+#   source_address_prefix       = "*"
+#   destination_address_prefix  = "*"
+#   resource_group_name         = var.resource_group_name
+#   network_security_group_name = each.value.name
+#   description                 = "Deny all inbound traffic not explicitly allowed"
+# }
 
-resource "azurerm_subnet_network_security_group_association" "container_apps" {
-  subnet_id                 = var.subnet_id_container_apps
-  network_security_group_id = var.nsg_id_container_apps
-}
-
-## Placeholder for future managed rules (add azurerm_network_security_rule resources referencing the same IDs)
+########## End of Managed Security Rules ##########

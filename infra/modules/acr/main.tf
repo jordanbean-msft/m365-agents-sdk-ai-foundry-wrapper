@@ -34,6 +34,12 @@ resource "azurerm_private_endpoint" "acr" {
     is_manual_connection           = false
     subresource_names              = ["registry"]
   }
+
+  lifecycle {
+    ignore_changes = [
+      private_dns_zone_group
+    ]
+  }
 }
 
 ## Diagnostic Settings for ACR
