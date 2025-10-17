@@ -19,6 +19,7 @@ resource "azurerm_container_app_environment" "main" {
     name                  = "Consumption"
     workload_profile_type = "Consumption"
   }
+  tags = var.common_tags
 }
 
 ## Create Container App with managed identity
@@ -109,32 +110,25 @@ resource "azurerm_container_app" "main" {
     server   = var.registry_server
     identity = var.user_assigned_identity_id
   }
+  tags = var.common_tags
 }
 
 ## Diagnostic Settings for Container App Environment
 resource "azurerm_monitor_diagnostic_setting" "container_app_env" {
+  count                      = var.enable_diagnostics ? 1 : 0
   name                       = "${azurerm_container_app_environment.main.name}-diag"
   target_resource_id         = azurerm_container_app_environment.main.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
-  enabled_log {
-    category_group = "allLogs"
-  }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
+  enabled_log { category_group = "allLogs" }
+  enabled_metric { category = "AllMetrics" }
 }
 
 ## Diagnostic Settings for Container App
 resource "azurerm_monitor_diagnostic_setting" "container_app" {
+  count                      = var.enable_diagnostics ? 1 : 0
   name                       = "${azurerm_container_app.main.name}-diag"
   target_resource_id         = azurerm_container_app.main.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
-  enabled_log {
-    category_group = "allLogs"
-  }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
+  enabled_log { category_group = "allLogs" }
+  enabled_metric { category = "AllMetrics" }
 }

@@ -76,3 +76,15 @@ variable "log_analytics_workspace_id" {
   type        = string
   default     = ""
 }
+
+variable "common_tags" {
+  description = "Common tags to apply to tag-supporting resources in this module"
+  type        = map(string)
+  default     = {}
+}
+
+variable "enable_diagnostics" {
+  description = "Enable diagnostic settings creation for container app resources"
+  type        = bool
+  default     = true
+}

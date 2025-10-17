@@ -77,3 +77,9 @@ variable "pe_aifoundry_id" {
   description = "ID of the AI Foundry private endpoint"
   type        = string
 }
+
+variable "common_tags" {
+  description = "Common tags to apply to tag-supporting resources in this module"
+  type        = map(string)
+  default     = {}
+}

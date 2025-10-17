@@ -7,6 +7,7 @@ resource "azurerm_storage_account" "storage_account" {
   name                = "aifoundry${var.unique_suffix}storage"
   resource_group_name = var.resource_group_name
   location            = var.location
+  tags                = var.common_tags
 
   account_kind             = "StorageV2"
   account_tier             = "Standard"
@@ -32,6 +33,7 @@ resource "azurerm_cosmosdb_account" "cosmosdb" {
   name                = "aifoundry${var.unique_suffix}cosmosdb"
   location            = var.location
   resource_group_name = var.resource_group_name
+  tags                = var.common_tags
 
   # General settings
   offer_type        = "Standard"
@@ -67,6 +69,7 @@ resource "azapi_resource" "ai_search" {
   parent_id                 = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}"
   location                  = var.location
   schema_validation_enabled = true
+  tags                      = var.common_tags
 
   body = {
     sku = {
@@ -103,41 +106,28 @@ resource "azapi_resource" "ai_search" {
 
 ## Diagnostic Settings
 resource "azurerm_monitor_diagnostic_setting" "storage_account" {
+  count                      = var.enable_diagnostics ? 1 : 0
   name                       = "${azurerm_storage_account.storage_account.name}-diag"
   target_resource_id         = azurerm_storage_account.storage_account.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
-  # Storage Accounts do not support category_group allLogs in this region/provider; enumerate categories explicitly
-  enabled_log { category = "StorageRead" }
-  enabled_log { category = "StorageWrite" }
-  enabled_log { category = "StorageDelete" }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
+  # Removed unsupported log categories; keeping metrics only until correct categories confirmed.
+  enabled_metric { category = "AllMetrics" }
 }
 
 resource "azurerm_monitor_diagnostic_setting" "cosmosdb" {
+  count                      = var.enable_diagnostics ? 1 : 0
   name                       = "${azurerm_cosmosdb_account.cosmosdb.name}-diag"
   target_resource_id         = azurerm_cosmosdb_account.cosmosdb.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
-  enabled_log {
-    category_group = "allLogs"
-  }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
+  enabled_log { category_group = "allLogs" }
+  enabled_metric { category = "AllMetrics" }
 }
 
 resource "azurerm_monitor_diagnostic_setting" "ai_search" {
+  count                      = var.enable_diagnostics ? 1 : 0
   name                       = "${azapi_resource.ai_search.name}-diag"
   target_resource_id         = azapi_resource.ai_search.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
-  enabled_log {
-    category_group = "allLogs"
-  }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
+  enabled_log { category_group = "allLogs" }
+  enabled_metric { category = "AllMetrics" }
 }

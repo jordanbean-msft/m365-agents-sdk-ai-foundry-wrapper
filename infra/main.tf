@@ -7,6 +7,28 @@ module "foundation" {
   source = "./modules/foundation"
 }
 
+## NSGs module - Attaches Network Security Groups to existing subnets
+##
+module "nsgs" {
+  source = "./modules/nsgs"
+
+  providers = {
+    azurerm = azurerm.workload_subscription
+  }
+
+  unique_suffix              = module.foundation.unique_suffix
+  resource_group_name        = var.resource_group_name_resources
+  location                   = var.location
+  subnet_id_agent            = var.subnet_id_agent
+  subnet_id_private_endpoint = var.subnet_id_private_endpoint
+  subnet_id_logic_apps       = var.subnet_id_logic_apps
+  subnet_id_container_apps   = var.subnet_id_container_apps
+  nsg_id_agent               = var.nsg_id_agent
+  nsg_id_private_endpoints   = var.nsg_id_private_endpoints
+  nsg_id_logic_apps          = var.nsg_id_logic_apps
+  nsg_id_container_apps      = var.nsg_id_container_apps
+}
+
 ## Storage module - Creates storage resources for agent data
 ##
 module "storage" {
@@ -21,6 +43,8 @@ module "storage" {
   location                   = var.location
   subscription_id            = var.subscription_id_resources
   log_analytics_workspace_id = var.log_analytics_workspace_id
+  common_tags                = var.common_tags
+  enable_diagnostics         = var.enable_diagnostics
 }
 
 ## AI Foundry module - Creates AI Foundry resource and deployments
@@ -39,6 +63,8 @@ module "ai_foundry" {
   subscription_id            = var.subscription_id_resources
   subnet_id_agent            = var.subnet_id_agent
   log_analytics_workspace_id = var.log_analytics_workspace_id
+  common_tags                = var.common_tags
+  enable_diagnostics         = var.enable_diagnostics
 }
 
 ## Networking module - Creates private endpoints
@@ -67,6 +93,7 @@ module "networking" {
   ai_search_name       = module.storage.ai_search_name
   ai_foundry_id        = module.ai_foundry.ai_foundry_id
   ai_foundry_name      = module.ai_foundry.ai_foundry_name
+  common_tags          = var.common_tags
 }
 
 ## Project module - Creates AI Foundry project, connections, and role assignments
@@ -99,6 +126,7 @@ module "project" {
   pe_cosmosdb_id                        = module.networking.pe_cosmosdb_id
   pe_aisearch_id                        = module.networking.pe_aisearch_id
   pe_aifoundry_id                       = module.networking.pe_aifoundry_id
+  common_tags                           = var.common_tags
 }
 
 ## Logic Apps module - Creates Logic Apps Standard with private endpoints and VNet integration
@@ -116,6 +144,8 @@ module "logic_apps" {
   subnet_id_logic_apps       = var.subnet_id_logic_apps
   subnet_id_private_endpoint = var.subnet_id_private_endpoint
   log_analytics_workspace_id = var.log_analytics_workspace_id
+  common_tags                = var.common_tags
+  enable_diagnostics         = var.enable_diagnostics
 }
 
 ## Identity module - User Assigned Managed Identity for Container Apps
@@ -130,6 +160,7 @@ module "identity" {
   unique_suffix       = module.foundation.unique_suffix
   resource_group_name = var.resource_group_name_resources
   location            = var.location
+  common_tags         = var.common_tags
 }
 
 ## ACR module - Azure Container Registry for private images
@@ -148,6 +179,8 @@ module "acr" {
   pull_principal_id          = module.identity.user_assigned_identity_principal_id
   subnet_id_private_endpoint = var.subnet_id_private_endpoint
   log_analytics_workspace_id = var.log_analytics_workspace_id
+  common_tags                = var.common_tags
+  enable_diagnostics         = var.enable_diagnostics
 }
 
 ## Container Apps module - Creates Container App Environment and Container App with VNet integration
@@ -181,6 +214,8 @@ module "container_apps" {
   registry_server                  = module.acr.acr_login_server
   user_assigned_identity_id        = module.identity.user_assigned_identity_id
   log_analytics_workspace_id       = var.log_analytics_workspace_id
+  common_tags                      = var.common_tags
+  enable_diagnostics               = var.enable_diagnostics
 }
 
 

@@ -147,7 +147,8 @@ foundation
     │       └── networking
     ├── ai-foundry ┘
     │           └── project
-    └── logic_apps
+  ├── logic_apps
+  └── nsgs (independent - secures existing subnets)
 ```
 
 ## Usage
@@ -177,3 +178,4 @@ module "storage" {
 3. **Maintainability**: Changes to one component don't affect others
 4. **Testability**: Individual modules can be tested independently
 5. **Clarity**: Easier to understand the infrastructure layout
+6. **Security**: Dedicated NSGs attached per subnet allowing future rule hardening without impacting other network segments

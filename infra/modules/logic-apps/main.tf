@@ -24,6 +24,7 @@ resource "azurerm_storage_account" "logic_apps_storage" {
       "AzureServices"
     ]
   }
+  tags = var.common_tags
 }
 
 ## Create App Service Plan for Logic Apps Standard
@@ -34,6 +35,7 @@ resource "azurerm_service_plan" "logic_apps_plan" {
   location            = var.location
   os_type             = "Windows"
   sku_name            = "WS1"
+  tags                = var.common_tags
 }
 
 ## Create Logic App Standard (Workflow)
@@ -73,6 +75,7 @@ resource "azurerm_logic_app_standard" "logic_app" {
     ## Enable VNet route all
     vnet_route_all_enabled = true
   }
+  tags = var.common_tags
 }
 
 ## Create Private Endpoint for Logic Apps Storage Account
@@ -95,6 +98,7 @@ resource "azurerm_private_endpoint" "pe_logic_apps_storage" {
     ]
     is_manual_connection = false
   }
+  tags = var.common_tags
 }
 
 ## Create Private Endpoint for Logic Apps (sites)
@@ -117,33 +121,25 @@ resource "azurerm_private_endpoint" "pe_logic_app" {
     ]
     is_manual_connection = false
   }
+  tags = var.common_tags
 }
 
 ## Diagnostic Settings for Logic Apps Storage Account
 resource "azurerm_monitor_diagnostic_setting" "logicapps_storage" {
+  count                      = var.enable_diagnostics ? 1 : 0
   name                       = "${azurerm_storage_account.logic_apps_storage.name}-diag"
   target_resource_id         = azurerm_storage_account.logic_apps_storage.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
-  # Storage diagnostic: explicit categories (category_group unsupported for storage accounts)
-  enabled_log { category = "StorageRead" }
-  enabled_log { category = "StorageWrite" }
-  enabled_log { category = "StorageDelete" }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
+  # Removed unsupported log categories; metrics only until valid categories confirmed.
+  enabled_metric { category = "AllMetrics" }
 }
 
 ## Diagnostic Settings for Logic App Standard
 resource "azurerm_monitor_diagnostic_setting" "logic_app" {
+  count                      = var.enable_diagnostics ? 1 : 0
   name                       = "${azurerm_logic_app_standard.logic_app.name}-diag"
   target_resource_id         = azurerm_logic_app_standard.logic_app.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
-  enabled_log {
-    category_group = "allLogs"
-  }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
+  enabled_log { category_group = "allLogs" }
+  enabled_metric { category = "AllMetrics" }
 }

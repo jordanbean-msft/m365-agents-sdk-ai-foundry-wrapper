@@ -9,6 +9,7 @@ resource "azapi_resource" "ai_foundry" {
   parent_id                 = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}"
   location                  = var.location
   schema_validation_enabled = false
+  tags                      = var.common_tags
 
   body = {
     kind = "AIServices",
@@ -72,6 +73,7 @@ resource "azurerm_cognitive_deployment" "aifoundry_deployment_gpt_4o" {
 
 ## Diagnostic Settings for AI Foundry (Cognitive Services Account)
 resource "azurerm_monitor_diagnostic_setting" "ai_foundry" {
+  count                      = var.enable_diagnostics ? 1 : 0
   name                       = "${azapi_resource.ai_foundry.name}-diag"
   target_resource_id         = azapi_resource.ai_foundry.id
   log_analytics_workspace_id = var.log_analytics_workspace_id

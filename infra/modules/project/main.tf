@@ -16,6 +16,7 @@ resource "azapi_resource" "ai_foundry_project" {
   parent_id                 = var.ai_foundry_id
   location                  = var.location
   schema_validation_enabled = false
+  tags                      = var.common_tags
 
   body = {
     sku = {

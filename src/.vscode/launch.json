@@ -1,0 +1,63 @@
+{
+  // VS Code debug configurations for Azure AI Streaming sample
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Streaming Agent (uv)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "src.main",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "preLaunchTask": "uv sync",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "envFile": "${workspaceFolder}/.env",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      }
+    },
+    {
+      "name": "Python: Attach by Process Id",
+      "type": "debugpy",
+      "request": "attach",
+      "processId": "${command:pickProcess}",
+      "justMyCode": false
+    },
+    {
+      "name": "Python: Attach to Port 5678",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "justMyCode": false,
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/src",
+          "remoteRoot": "/app/src"
+        }
+      ]
+    },
+    {
+      "name": "Python: Run with Debugpy (listen 5678)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "debugpy",
+      "args": [
+        "--listen",
+        "5678",
+        "--wait-for-client",
+        "${workspaceFolder}/src/main.py"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "envFile": "${workspaceFolder}/.env",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      }
+    }
+  ]
+}

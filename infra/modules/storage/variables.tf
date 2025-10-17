@@ -22,3 +22,15 @@ variable "log_analytics_workspace_id" {
   description = "Log Analytics Workspace resource ID for diagnostics"
   type        = string
 }
+
+variable "common_tags" {
+  description = "Common tags to apply to tag-supporting resources in this module"
+  type        = map(string)
+  default     = {}
+}
+
+variable "enable_diagnostics" {
+  description = "Enable diagnostic settings creation for storage-related resources"
+  type        = bool
+  default     = true
+}

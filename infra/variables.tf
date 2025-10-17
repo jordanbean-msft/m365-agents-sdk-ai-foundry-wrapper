@@ -66,3 +66,36 @@ variable "log_analytics_workspace_id" {
   description = "Resource ID of an existing Log Analytics Workspace to attach supported services to (e.g. /subscriptions/xxxx/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/my-law)"
   type        = string
 }
+
+variable "common_tags" {
+  description = "A map of tags to apply to all Azure resources (where supported). Provider default tags cover azurerm resources; critical azapi resources are tagged explicitly."
+  type        = map(string)
+  default     = {}
+}
+
+variable "enable_diagnostics" {
+  description = "Toggle creation of diagnostic settings across all modules. Set to false to skip until resources exist or categories confirmed."
+  type        = bool
+  default     = true
+}
+
+## Existing NSG resource IDs (module nsgs now references existing NSGs by ID)
+variable "nsg_id_agent" {
+  description = "Resource ID of existing Network Security Group for agent subnet"
+  type        = string
+}
+
+variable "nsg_id_private_endpoints" {
+  description = "Resource ID of existing Network Security Group for private endpoints subnet"
+  type        = string
+}
+
+variable "nsg_id_logic_apps" {
+  description = "Resource ID of existing Network Security Group for logic apps subnet"
+  type        = string
+}
+
+variable "nsg_id_container_apps" {
+  description = "Resource ID of existing Network Security Group for container apps subnet"
+  type        = string
+}

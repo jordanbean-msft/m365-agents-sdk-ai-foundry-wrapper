@@ -1,0 +1,87 @@
+# Copilot Instructions for AI Foundry Terraform Infrastructure
+
+## Project Overview
+
+This repository provisions a secure, modular Azure infrastructure for AI Foundry agent-based applications using Terraform. The design emphasizes network isolation, least-privilege access, and modularity for maintainability and clarity.
+
+## Architecture & Modules
+
+- **Modules are in `infra/modules/`**. Each subfolder is a logical unit (e.g., `storage`, `ai-foundry`, `container-apps`, `logic-apps`).
+- **Data flow:**
+  - `foundation` → `storage`/`ai-foundry`/`identity`/`acr` → `networking` → `project`/`container-apps`/`logic-apps`
+  - `nsgs` module is independent (attaches NSGs to existing subnets) and can be modified safely without impacting resource creation order.
+- **Key cross-module dependencies** are managed via outputs and explicit input variables (see each module's `variables.tf` and `outputs.tf`).
+- **All resources are private**: Public network access is disabled for storage, Logic Apps, and Container Apps. Access is via private endpoints and VNet integration only.
+
+## Developer Workflows
+
+- **Terraform root is `infra/`**. Run all Terraform commands from this directory.
+- **Standard workflow:**
+  1. `terraform fmt`
+  2. `terraform init`
+  3. `terraform validate`
+  4. `terraform plan`
+  5. `terraform apply`
+- **Variables:**
+  - All environment-specific values are set in `infra/terraform.tfvars`.
+  - Subnet IDs must reference pre-existing subnets in your VNet (see module READMEs for required properties).
+  - `common_tags` map applied to all tag-supporting resources (propagated explicitly through modules). Add new standard tags here only.
+- **Module composition:**
+  - The root `main.tf` wires modules together, passing outputs as needed.
+  - Example: `module.project` depends on outputs from `module.networking`, `module.storage`, and `module.ai_foundry`.
+
+## Patterns & Conventions
+
+- **Resource naming:**
+  - All resources use a `unique_suffix` from the `foundation` module for global uniqueness.
+  - Example: `project${unique_suffix}`
+- **Identity:**
+  - User-assigned managed identities are used for all compute resources.
+  - Container Apps use user-assigned identities for secure ACR pulls and Azure resource access.
+- **RBAC:**
+  - Role assignments are explicit and scoped to the minimum required resources.
+  - Data plane and control plane roles are assigned after resource creation, with `time_sleep` resources to ensure propagation.
+- **Secrets:**
+  - Sensitive values (e.g., client secrets) are passed as Terraform variables and stored as secrets in Azure resources, not as environment variables.
+- **Networking:**
+  - All resources are deployed into a VNet with private endpoints.
+  - Logic Apps and Container Apps have VNet integration for secure outbound access.
+  - NSGs (`nsgs` module) are attached per subnet: agent, private endpoints, logic-apps, container-apps. Default rules (deny inbound except VirtualNetwork) currently in effect; add explicit rules inside that module only.
+  - No public IPs are assigned; public network access disabled on all services.
+  - Tag consistency is enforced via `common_tags` variable rather than provider default tags (azapi resources require explicit tagging).
+
+## Integration Points
+
+- **AI Foundry:**
+  - The `ai-foundry` and `project` modules provision the AI Foundry account, project, and connect to Cosmos DB, Storage, and AI Search.
+  - The `container-apps` module configures environment variables for agent integration (see its README for details).
+- **Logic Apps:**
+  - Fully network-isolated, with private endpoints and VNet integration. Use the Azure Portal or VS Code extension for workflow development.
+- **Container Apps:**
+  - Deployed with VNet integration, private ACR, and managed identities. Ingress is internal-only by default.
+
+## Examples
+
+- **Adding a new environment:** Copy and adjust `terraform.tfvars` for the new environment. Ensure all required subnets exist.
+- **Referencing module outputs:**
+  ```hcl
+  output_from_other_module = module.other_module.output_name
+  ```
+- **Granting access:**
+  - After deployment, grant managed identities access to required Azure resources as needed.
+
+## Key Files
+
+- `infra/main.tf`: Root Terraform configuration, wires modules together
+- `infra/terraform.tfvars`: Environment-specific variables
+- `infra/modules/*/README.md`: Module-specific documentation and requirements
+- `infra/modules/nsgs/`: Network Security Groups + subnet associations (do not duplicate elsewhere)
+
+---
+
+**For AI agents:**
+
+- Always read module READMEs before modifying or adding modules.
+- Maintain strict network isolation and least-privilege access patterns. Add/modify NSG rules only in `modules/nsgs` to keep security centralized.
+- Use outputs and variables to connect modules—avoid hardcoding resource IDs.
+- Document any new patterns or workflows in the appropriate module README.

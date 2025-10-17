@@ -10,6 +10,7 @@ resource "azurerm_container_registry" "main" {
   data_endpoint_enabled         = false
   public_network_access_enabled = false
   zone_redundancy_enabled       = false
+  tags                          = var.common_tags
 }
 
 resource "azurerm_role_assignment" "acr_pull" {
@@ -25,6 +26,7 @@ resource "azurerm_private_endpoint" "acr" {
   location            = var.location
   resource_group_name = var.resource_group_name
   subnet_id           = var.subnet_id_private_endpoint
+  tags                = var.common_tags
 
   private_service_connection {
     name                           = "acr-psc-${var.unique_suffix}"
@@ -36,14 +38,10 @@ resource "azurerm_private_endpoint" "acr" {
 
 ## Diagnostic Settings for ACR
 resource "azurerm_monitor_diagnostic_setting" "acr" {
+  count                      = var.enable_diagnostics ? 1 : 0
   name                       = "${azurerm_container_registry.main.name}-diag"
   target_resource_id         = azurerm_container_registry.main.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
-  enabled_log {
-    category_group = "allLogs"
-  }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
+  enabled_log { category_group = "allLogs" }
+  enabled_metric { category = "AllMetrics" }
 }

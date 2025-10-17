@@ -12,6 +12,7 @@ resource "azurerm_private_endpoint" "pe_storage" {
   location            = var.location
   resource_group_name = var.resource_group_name
   subnet_id           = var.subnet_id_private_endpoint
+  tags                = var.common_tags
   private_service_connection {
     name                           = "${var.storage_account_name}-private-link-service-connection"
     private_connection_resource_id = var.storage_account_id
@@ -34,6 +35,7 @@ resource "azurerm_private_endpoint" "pe_cosmosdb" {
   location            = var.location
   resource_group_name = var.resource_group_name
   subnet_id           = var.subnet_id_private_endpoint
+  tags                = var.common_tags
 
   private_service_connection {
     name                           = "${var.cosmosdb_name}-private-link-service-connection"
@@ -57,6 +59,7 @@ resource "azurerm_private_endpoint" "pe_aisearch" {
   location            = var.location
   resource_group_name = var.resource_group_name
   subnet_id           = var.subnet_id_private_endpoint
+  tags                = var.common_tags
 
   private_service_connection {
     name                           = "${var.ai_search_name}-private-link-service-connection"
@@ -80,6 +83,7 @@ resource "azurerm_private_endpoint" "pe_aifoundry" {
   location            = var.location
   resource_group_name = var.resource_group_name
   subnet_id           = var.subnet_id_private_endpoint
+  tags                = var.common_tags
 
   private_service_connection {
     name                           = "${var.ai_foundry_name}-private-link-service-connection"
