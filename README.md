@@ -14,3 +14,7 @@
 ## Deployment
 
 ## Links
+
+## Utility Scripts (Logic App Workflow)
+
+See `infra/scripts/README.md` for a `uv`-enabled helper script (`create_default_logicapp_workflow.py`) that can deploy a minimal Logic App Standard workflow and optionally register it as an OpenAPI tool in an AI Foundry project.

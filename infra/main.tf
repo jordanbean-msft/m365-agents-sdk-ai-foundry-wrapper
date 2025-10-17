@@ -138,14 +138,21 @@ module "logic_apps" {
     azurerm = azurerm.workload_subscription
   }
 
-  unique_suffix              = module.foundation.unique_suffix
-  resource_group_name        = var.resource_group_name_resources
-  location                   = var.location
-  subnet_id_logic_apps       = var.subnet_id_logic_apps
-  subnet_id_private_endpoint = var.subnet_id_private_endpoint
-  log_analytics_workspace_id = var.log_analytics_workspace_id
-  common_tags                = var.common_tags
-  enable_diagnostics         = var.enable_diagnostics
+  depends_on = [
+    module.identity
+  ]
+
+  unique_suffix                       = module.foundation.unique_suffix
+  resource_group_name                 = var.resource_group_name_resources
+  location                            = var.location
+  subnet_id_logic_apps                = var.subnet_id_logic_apps
+  subnet_id_private_endpoint          = var.subnet_id_private_endpoint
+  user_assigned_identity_id           = module.identity.user_assigned_identity_id
+  user_assigned_identity_principal_id = module.identity.user_assigned_identity_principal_id
+  website_dns_server                  = var.logic_apps_website_dns_server
+  log_analytics_workspace_id          = var.log_analytics_workspace_id
+  common_tags                         = var.common_tags
+  enable_diagnostics                  = var.enable_diagnostics
 }
 
 ## Identity module - User Assigned Managed Identity for Container Apps

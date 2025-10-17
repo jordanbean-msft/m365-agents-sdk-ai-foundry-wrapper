@@ -48,9 +48,12 @@ resource "azurerm_logic_app_standard" "logic_app" {
   storage_account_name       = azurerm_storage_account.logic_apps_storage.name
   storage_account_access_key = azurerm_storage_account.logic_apps_storage.primary_access_key
 
-  ## Enable system-assigned managed identity
+  ## Enable user-assigned managed identity
   identity {
-    type = "SystemAssigned"
+    type = "UserAssigned"
+    identity_ids = [
+      var.user_assigned_identity_id
+    ]
   }
 
   ## VNet integration
@@ -61,9 +64,13 @@ resource "azurerm_logic_app_standard" "logic_app" {
 
   ## App settings
   app_settings = {
-    "FUNCTIONS_WORKER_RUNTIME"     = "dotnet"
-    "WEBSITE_NODE_DEFAULT_VERSION" = "~18"
-    "WEBSITE_CONTENTOVERVNET"      = "1"
+    "FUNCTIONS_WORKER_RUNTIME"         = "dotnet"
+    "WEBSITE_NODE_DEFAULT_VERSION"     = "~22"
+    "WEBSITE_CONTENTOVERVNET"          = "1"
+    "WEBSITE_AUTH_AAD_ALLOWED_TENANTS" = "*"
+    "WEBSITE_AUTH_AAD_REQUIRE_HTTPS"   = "true"
+    "WEBSITE_RUN_FROM_PACKAGE"         = 1
+    "WEBSITE_DNS_SERVER"               = var.website_dns_server
   }
 
   ## Site configuration
@@ -154,4 +161,12 @@ resource "azurerm_monitor_diagnostic_setting" "logic_app" {
   log_analytics_workspace_id = var.log_analytics_workspace_id
   enabled_log { category_group = "allLogs" }
   enabled_metric { category = "AllMetrics" }
+}
+
+## Grant the user-assigned managed identity access to invoke the Logic App
+## Logic App Contributor allows managing workflows and invoking them
+resource "azurerm_role_assignment" "uami_logic_app_contributor" {
+  scope                = azurerm_logic_app_standard.logic_app.id
+  role_definition_name = "Logic App Contributor"
+  principal_id         = var.user_assigned_identity_principal_id
 }

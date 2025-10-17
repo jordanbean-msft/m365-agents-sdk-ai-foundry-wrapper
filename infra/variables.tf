@@ -99,3 +99,9 @@ variable "nsg_id_container_apps" {
   description = "Resource ID of existing Network Security Group for container apps subnet"
   type        = string
 }
+
+## Optional Logic Apps settings
+variable "logic_apps_website_dns_server" {
+  description = "DNS server IP address to set as WEBSITE_DNS_SERVER for the Logic App"
+  type        = string
+}

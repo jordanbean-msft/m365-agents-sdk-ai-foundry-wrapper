@@ -39,3 +39,18 @@ variable "enable_diagnostics" {
   type        = bool
   default     = true
 }
+
+variable "user_assigned_identity_id" {
+  description = "Resource ID of the user-assigned managed identity for Logic Apps"
+  type        = string
+}
+
+variable "user_assigned_identity_principal_id" {
+  description = "Principal ID of the user-assigned managed identity (for role assignments)"
+  type        = string
+}
+
+variable "website_dns_server" {
+  description = "DNS server IP address for WEBSITE_DNS_SERVER app setting."
+  type        = string
+}

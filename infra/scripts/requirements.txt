@@ -1,0 +1,6 @@
+# Requirements for create_default_logicapp_workflow.py
+# Install with: pip install -r requirements.txt
+
+requests>=2.32.0
+azure-identity>=1.17.0
+azure-ai-agents>=1.0.0b6
