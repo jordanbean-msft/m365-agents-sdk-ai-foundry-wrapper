@@ -87,6 +87,66 @@ resource "azurerm_private_endpoint" "pe_logic_apps_storage_file" {
   }
 }
 
+## Create Private Endpoint for Logic Apps Storage Account (queue)
+## Created before file share to establish network connectivity
+##
+resource "azurerm_private_endpoint" "pe_logic_apps_storage_queue" {
+  depends_on = [
+    azurerm_storage_account.logic_apps_storage
+  ]
+
+  name                = "${azurerm_storage_account.logic_apps_storage.name}-queue-private-endpoint"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  subnet_id           = var.subnet_id_private_endpoint
+
+  private_service_connection {
+    name                           = "${azurerm_storage_account.logic_apps_storage.name}-queue-private-link-service-connection"
+    private_connection_resource_id = azurerm_storage_account.logic_apps_storage.id
+    subresource_names = [
+      "queue"
+    ]
+    is_manual_connection = false
+  }
+  tags = var.common_tags
+
+  lifecycle {
+    ignore_changes = [
+      private_dns_zone_group
+    ]
+  }
+}
+
+## Create Private Endpoint for Logic Apps Storage Account (table)
+## Created before file share to establish network connectivity
+##
+resource "azurerm_private_endpoint" "pe_logic_apps_storage_table" {
+  depends_on = [
+    azurerm_storage_account.logic_apps_storage
+  ]
+
+  name                = "${azurerm_storage_account.logic_apps_storage.name}-table-private-endpoint"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  subnet_id           = var.subnet_id_private_endpoint
+
+  private_service_connection {
+    name                           = "${azurerm_storage_account.logic_apps_storage.name}-table-private-link-service-connection"
+    private_connection_resource_id = azurerm_storage_account.logic_apps_storage.id
+    subresource_names = [
+      "table"
+    ]
+    is_manual_connection = false
+  }
+  tags = var.common_tags
+
+  lifecycle {
+    ignore_changes = [
+      private_dns_zone_group
+    ]
+  }
+}
+
 ## Create file share for Logic Apps content
 ## Created after private endpoints to ensure network access
 ##
@@ -97,7 +157,9 @@ resource "azurerm_storage_share" "logic_apps_content" {
 
   depends_on = [
     azurerm_private_endpoint.pe_logic_apps_storage_blob,
-    azurerm_private_endpoint.pe_logic_apps_storage_file
+    azurerm_private_endpoint.pe_logic_apps_storage_file,
+    azurerm_private_endpoint.pe_logic_apps_storage_queue,
+    azurerm_private_endpoint.pe_logic_apps_storage_table
   ]
 }
 
@@ -151,7 +213,6 @@ resource "azurerm_logic_app_standard" "logic_app" {
     "AzureWebJobsStorage"                      = "DefaultEndpointsProtocol=https;AccountName=${azurerm_storage_account.logic_apps_storage.name};AccountKey=${azurerm_storage_account.logic_apps_storage.primary_access_key};EndpointSuffix=core.windows.net"
     "WEBSITE_AUTH_AAD_ALLOWED_TENANTS"         = "*"
     "WEBSITE_AUTH_AAD_REQUIRE_HTTPS"           = "true"
-    "WEBSITE_RUN_FROM_PACKAGE"                 = 1
     "WEBSITE_DNS_SERVER"                       = var.website_dns_server
     "WEBSITE_VNET_ROUTE_ALL"                   = "1"
   }

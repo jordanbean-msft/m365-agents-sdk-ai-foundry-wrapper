@@ -54,13 +54,14 @@ import io
 import json
 import sys
 import time
-import zipfile
 import traceback
+import zipfile
+from pathlib import Path
 from typing import Tuple
 
 import requests
-from azure.identity import DefaultAzureCredential
 from azure.core.exceptions import AzureError
+from azure.identity import DefaultAzureCredential
 
 # Attempt optional imports for OpenAPI tool registration
 try:
@@ -78,50 +79,36 @@ MGMT_API_VERSION_WORKFLOW = "2022-03-01"  # For workflow callback URL (Logic App
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def log(msg: str) -> None:
     print(f"[create-workflow] {msg}")
+
+
+def load_workflow_template() -> dict:
+    """Load the workflow definition from the external JSON file."""
+    script_dir = Path(__file__).parent
+    workflow_file = script_dir / "workflow_definition.json"
+
+    if not workflow_file.exists():
+        raise FileNotFoundError(f"Workflow definition file not found: {workflow_file}")
+
+    with open(workflow_file, 'r') as f:
+        return json.load(f)
 
 
 def build_workflow_definition(workflow_name: str) -> dict:
     """Builds the Logic App Standard workflow definition.
 
-    A simple manual HTTP trigger that echoes an input parameter.
+    Loads from external JSON template and customizes with workflow name.
     """
-    return {
-        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2019-05-01/workflowdefinition.json#",
-        "contentVersion": "1.0.0.0",
-        "triggers": {
-            "manual": {
-                "type": "Request",
-                "kind": "Http",
-                "inputs": {
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "inputParam": {"type": "string"}
-                        },
-                        "required": ["inputParam"]
-                    }
-                }
-            }
-        },
-        "actions": {
-            "Respond": {
-                "type": "Response",
-                "kind": "Http",
-                "inputs": {
-                    "statusCode": 200,
-                    "body": {
-                        "echo": "@triggerBody()?['inputParam']",
-                        "workflow": workflow_name,
-                        "timestamp": "@utcNow()"
-                    }
-                },
-                "runAfter": {}
-            }
-        },
-        "outputs": {}
-    }
+    template = load_workflow_template()
+
+    # Customize the response body to include the workflow name
+    if "definition" in template and "actions" in template["definition"]:
+        if "Respond" in template["definition"]["actions"]:
+            template["definition"]["actions"]["Respond"]["inputs"]["body"]["workflow"] = workflow_name
+
+    return template["definition"]
 
 
 def build_zip_package(workflow_name: str) -> bytes:
@@ -143,7 +130,8 @@ def build_zip_package(workflow_name: str) -> bytes:
     with zipfile.ZipFile(mem_file, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("host.json", json.dumps(host_json, indent=2))
         # Standard layout: workflows/<name>/workflow.json
-        zf.writestr(f"workflows/{workflow_name}/workflow.json", json.dumps(workflow_content, indent=2))
+        zf.writestr(f"workflows/{workflow_name}/workflow.json",
+                    json.dumps(workflow_content, indent=2))
     mem_file.seek(0)
     return mem_file.read()
 
@@ -211,61 +199,149 @@ def get_trigger_callback_url(subscription_id: str, resource_group: str, site_nam
     return value
 
 
-def register_openapi_tool(project: str, workflow_name: str, callback_url: str, tool_name: str) -> None:
-    if not _HAS_AGENTS:
-        raise RuntimeError("azure-ai-agents package not installed; cannot register OpenAPI tool.")
-    log("Registering OpenAPI tool in AI Foundry project...")
-    credential = DefaultAzureCredential()
-    client = AgentsClient(endpoint=f"https://{project}.agents.azure.com", credential=credential)
+def load_openapi_template() -> dict:
+    """Load the OpenAPI spec template from the external JSON file."""
+    script_dir = Path(__file__).parent
+    openapi_file = script_dir / "openapi_spec_template.json"
 
+    if not openapi_file.exists():
+        raise FileNotFoundError(
+            f"OpenAPI spec template file not found: {openapi_file}"
+        )
+
+    with open(openapi_file, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+
+def build_openapi_spec(workflow_name: str, callback_url: str) -> dict:
+    """Build the OpenAPI spec by customizing the template.
+
+    Args:
+        workflow_name: Name of the Logic App workflow
+        callback_url: Full callback URL including signature
+
+    Returns:
+        Customized OpenAPI specification
+    """
+    spec = load_openapi_template()
     base_url = callback_url.split("?")[0]
-    openapi_spec = {
-        "openapi": "3.0.1",
-        "info": {
-            "title": f"Logic App Workflow {workflow_name}",
-            "version": "1.0.0",
-            "description": "Auto-generated OpenAPI spec for Logic App workflow HTTP trigger"
-        },
-        "servers": [{"url": base_url}],
-        "paths": {
-            "/": {
-                "post": {
-                    "operationId": f"invoke_{workflow_name}",
-                    "summary": f"Invoke Logic App workflow {workflow_name}",
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"inputParam": {"type": "string"}},
-                                    "required": ["inputParam"]
-                                }
-                            }
-                        }
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "Success",
-                            "content": {
-                                "application/json": {"schema": {"type": "object"}}
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "components": {
-            "securitySchemes": {
-                "sig": {"type": "apiKey", "name": "sig", "in": "query"}
-            }
-        },
-        "security": [{"sig": []}]
-    }
 
-    tool = OpenApiTool(name=tool_name, spec=openapi_spec, description=f"Logic App workflow {workflow_name}")
-    client.tools.create_or_update(project_name=project, tool=tool)
-    log("OpenAPI tool registered successfully.")
+    # Customize the spec with actual values
+    spec["info"]["title"] = f"Logic App Workflow {workflow_name}"
+    spec["servers"][0]["url"] = base_url
+    spec["paths"]["/"]["post"]["operationId"] = f"invoke_{workflow_name}"
+    spec["paths"]["/"]["post"]["summary"] = (
+        f"Invoke Logic App workflow {workflow_name}"
+    )
+
+    return spec
+
+
+def register_openapi_tool(
+    project: str, workflow_name: str, callback_url: str, tool_name: str
+) -> None:
+    if not _HAS_AGENTS:
+        raise RuntimeError(
+            "azure-ai-agents package not installed; "
+            "cannot register OpenAPI tool."
+        )
+    log("Creating custom connection with managed identity in AI Foundry...")
+
+    # The project parameter should be a connection string in the format:
+    # "region.api.azureml.ms;subscription_id;resource_group;workspace_name"
+    # Or just the project/workspace endpoint URL
+
+    credential = DefaultAzureCredential()
+
+    # Parse project endpoint - expected format:
+    # https://<account>.services.ai.azure.com/api/projects/<project-name>
+    if not project.startswith("https://"):
+        raise ValueError(
+            f"Invalid project endpoint format: {project}. "
+            "Expected: https://<account>.services.ai.azure.com/api/projects/<project-name>"
+        )
+
+    endpoint = project
+    log(f"Using AI Foundry project endpoint: {endpoint}")
+
+    # Use AIProjectClient to access agents
+    from azure.ai.projects import AIProjectClient
+
+    project_client = AIProjectClient(
+        credential=credential,
+        endpoint=endpoint
+    )
+
+    # Get the agents client from the project client
+    client = project_client.agents
+    openapi_spec = build_openapi_spec(workflow_name, callback_url)
+
+    # Import required models for managed identity auth
+    from azure.ai.agents.models import (OpenApiFunctionDefinition,
+                                        OpenApiManagedAuthDetails,
+                                        OpenApiManagedSecurityScheme,
+                                        OpenApiToolDefinition)
+
+    # Create managed identity auth details
+    # The security scheme defines the audience for the managed identity token
+    base_url = callback_url.split("?")[0]
+    security_scheme = OpenApiManagedSecurityScheme(
+        audience=base_url
+    )
+
+    managed_auth = OpenApiManagedAuthDetails(
+        security_scheme=security_scheme
+    )
+
+    # Create the OpenAPI function definition with managed identity auth
+    openapi_function = OpenApiFunctionDefinition(
+        name=tool_name,
+        description=f"Logic App workflow {workflow_name}",
+        spec=openapi_spec,
+        auth=managed_auth
+    )
+
+    # Create the tool definition wrapper
+    tool_definition = OpenApiToolDefinition(
+        openapi=openapi_function
+    )
+
+    log(f"Creating/updating agent with OpenAPI tool: {tool_name}")
+
+    # Create or update an agent that uses this tool
+    # First, try to find an existing agent
+    agents = client.list_agents()
+    agent_name = f"LogicApp-{workflow_name}-Agent"
+    existing_agent = None
+
+    for agent in agents:
+        if agent.name == agent_name:
+            existing_agent = agent
+            break
+
+    if existing_agent:
+        log(f"Updating existing agent: {existing_agent.id}")
+        client.update_agent(
+            agent_id=existing_agent.id,
+            name=agent_name,
+            description=f"Agent with access to Logic App workflow {workflow_name}",
+            instructions=f"You have access to a Logic App workflow called {workflow_name}. Use it when needed.",
+            tools=[tool_definition],
+            model="gpt-4o"
+        )
+        log(f"Agent updated: {existing_agent.id}")
+    else:
+        log(f"Creating new agent: {agent_name}")
+        agent = client.create_agent(
+            model="gpt-4o",
+            name=agent_name,
+            description=f"Agent with access to Logic App workflow {workflow_name}",
+            instructions=f"You have access to a Logic App workflow called {workflow_name}. Use it when needed.",
+            tools=[tool_definition]
+        )
+        log(f"Agent created: {agent.id}")
+
+    log("OpenAPI tool with managed identity registered successfully.")
 
 
 # ---------------------------------------------------------------------------
@@ -273,15 +349,23 @@ def register_openapi_tool(project: str, workflow_name: str, callback_url: str, t
 # ---------------------------------------------------------------------------
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Create / update a default Logic App Standard workflow with HTTP trigger + response.")
+    p = argparse.ArgumentParser(
+        description="Create / update a default Logic App Standard workflow with HTTP trigger + response.")
     p.add_argument("--subscription-id", required=True)
     p.add_argument("--resource-group", required=True)
-    p.add_argument("--logic-app-name", required=True, help="Name of the Logic App Standard site (App Service)")
+    p.add_argument("--logic-app-name", required=True,
+                   help="Name of the Logic App Standard site (App Service)")
     p.add_argument("--workflow-name", default="AgentHttpWorkflow")
-    p.add_argument("--register-openapi", action="store_true", help="Register workflow as OpenAPI tool in AI Foundry")
-    p.add_argument("--ai-foundry-project", help="AI Foundry project name (required if --register-openapi)")
-    p.add_argument("--tool-name", default="logicapp_workflow_tool", help="Tool name for OpenAPI registration")
-    p.add_argument("--debug", action="store_true", help="Print full traceback on error for troubleshooting")
+    p.add_argument("--register-openapi", action="store_true",
+                   help="Register workflow as OpenAPI tool in AI Foundry")
+    p.add_argument("--ai-foundry-project",
+                   help="AI Foundry project connection string or endpoint "
+                   "(e.g., 'eastus.api.azureml.ms;12345678-1234-5678-1234-567812345678;my-rg;my-ws') "
+                   "(required if --register-openapi)")
+    p.add_argument("--tool-name", default="logicapp_workflow_tool",
+                   help="Tool name for OpenAPI registration")
+    p.add_argument("--debug", action="store_true",
+                   help="Print full traceback on error for troubleshooting")
     return p.parse_args(argv)
 
 
@@ -296,7 +380,8 @@ def main(argv: list[str]) -> int:
         token = get_access_token()
         log("Acquired management access token.")
 
-        user, pwd = get_publishing_credentials(args.subscription_id, args.resource_group, args.logic_app_name, token)
+        user, pwd = get_publishing_credentials(
+            args.subscription_id, args.resource_group, args.logic_app_name, token)
         log("Retrieved publishing credentials.")
 
         zip_bytes = build_zip_package(args.workflow_name)

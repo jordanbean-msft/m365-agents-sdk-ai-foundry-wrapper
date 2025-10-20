@@ -1,0 +1,82 @@
+{
+  "openapi": "3.0.4",
+  "info": {
+    "title": "Logic App Workflow PLACEHOLDER",
+    "version": "1.0.0",
+    "description": "Auto-generated OpenAPI spec for Logic App workflow HTTP trigger"
+  },
+  "servers": [
+    {
+      "url": "BASE_URL_PLACEHOLDER"
+    }
+  ],
+  "paths": {
+    "/": {
+      "post": {
+        "operationId": "invoke_PLACEHOLDER",
+        "summary": "Invoke Logic App workflow PLACEHOLDER",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "inputParam": {
+                    "type": "string",
+                    "description": "Input parameter for the workflow"
+                  }
+                },
+                "required": [
+                  "inputParam"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "echo": {
+                      "type": "string",
+                      "description": "Echoed input parameter"
+                    },
+                    "workflow": {
+                      "type": "string",
+                      "description": "Name of the workflow that processed the request"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "UTC timestamp of the response"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sig": {
+        "type": "apiKey",
+        "name": "sig",
+        "in": "query",
+        "description": "Signature query parameter for authenticating requests to Logic Apps"
+      }
+    }
+  },
+  "security": [
+    {
+      "sig": []
+    }
+  ]
+}

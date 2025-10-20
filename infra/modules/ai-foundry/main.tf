@@ -61,7 +61,7 @@ resource "azurerm_cognitive_deployment" "aifoundry_deployment_gpt_4o" {
 
   sku {
     name     = "GlobalStandard"
-    capacity = 1
+    capacity = 100
   }
 
   model {
