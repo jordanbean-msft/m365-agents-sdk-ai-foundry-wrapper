@@ -1,3 +1,13 @@
+output "subscription_id" {
+  description = "Subscription ID where resources are deployed"
+  value       = var.subscription_id_resources
+}
+
+output "resource_group_name" {
+  description = "Name of the resource group where resources are deployed"
+  value       = var.resource_group_name_resources
+}
+
 output "ai_foundry_project_endpoint" {
   description = "Full endpoint URL for AI Foundry project SDK access"
   value       = module.project.ai_foundry_project_endpoint

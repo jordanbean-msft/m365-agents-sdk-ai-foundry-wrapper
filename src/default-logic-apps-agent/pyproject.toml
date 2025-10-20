@@ -8,6 +8,8 @@ dependencies = [
     "requests>=2.32.0",
     "azure-identity>=1.17.0",
     "azure-ai-agents>=1.0.0b6",
+    "azure-ai-projects>=1.0.0b3",
+    "types-requests>=2.32.0.20240914",
 ]
 
 [project.scripts]

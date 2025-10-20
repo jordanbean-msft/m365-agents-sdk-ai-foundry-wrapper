@@ -1,30 +1,13 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Logic App Workflow PLACEHOLDER",
+    "title": "Logic App Workflow AgentHttpWorkflow",
     "version": "1.0.0",
     "description": "Auto-generated OpenAPI spec for Logic App workflow HTTP trigger"
   },
-  "default_params": ["api-version", "sp", "sv"],
-  "functions": [
-    {
-      "name": "logicapp_workflow_tool_When_an_HTTP_request_is_received-invoke",
-      "description": "Logic App workflow PLACEHOLDER",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "inputParam": {
-            "type": "string",
-            "description": "Input parameter for the workflow"
-          }
-        },
-        "required": ["inputParam"]
-      }
-    }
-  ],
   "servers": [
     {
-      "url": "BASE_URL_PLACEHOLDER"
+      "url": "https://logic-1309.azurewebsites.net:443/api/AgentHttpWorkflow/triggers/When_an_HTTP_request_is_received/invoke"
     }
   ],
   "security": [
@@ -35,9 +18,9 @@
   "paths": {
     "/invoke": {
       "post": {
-        "operationId": "invoke_PLACEHOLDER",
-        "summary": "Invoke Logic App workflow PLACEHOLDER",
-        "description": "Invoke Logic App workflow PLACEHOLDER",
+        "operationId": "invoke_AgentHttpWorkflow",
+        "summary": "Invoke Logic App workflow AgentHttpWorkflow",
+        "description": "Invoke Logic App workflow AgentHttpWorkflow",
         "parameters": [
           {
             "name": "api-version",
@@ -66,7 +49,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "default": "%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun"
+              "default": "/triggers/When_an_HTTP_request_is_received/run"
             }
           }
         ],

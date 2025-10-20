@@ -1,0 +1,189 @@
+{
+  "created_at": 1758899942,
+  "description": "",
+  "id": "asst_rKFrzNZirBSms0GrgOO4fkar",
+  "instructions": "Your job is to help the user query a Log Analytics workspace for Windows & Linux event logs. You generate a KQL query and call your internal tools to retrieve the logs. If the result has more than 2 items, format as a table. Do not guess what table is correct to query, look it up in the docs. When in doubt, try querying the Event table. Limit the number of responses to 10 every time.",
+  "metadata": {},
+  "model": "gpt-4.1",
+  "name": "ops-agent",
+  "object": "assistant",
+  "response_format": "auto",
+  "temperature": 1.0,
+  "tool_resources": {
+    "code_interpreter": {
+      "file_ids": []
+    }
+  },
+  "tools": [
+    {
+      "bing_custom_search": {
+        "search_configurations": [
+          {
+            "connection_id": "/subscriptions/0ec6c427-01d3-4462-ae56-fd9656157157/resourceGroups/rg-law-aoai-eus2/providers/Microsoft.CognitiveServices/accounts/aif-law-aoai-eus2/projects/opsagents/connections/binglawaoaieus2",
+            "count": 5,
+            "instance_name": "microsoft-learn-docs",
+            "market": "en-us",
+            "set_lang": "en"
+          }
+        ]
+      },
+      "type": "bing_custom_search"
+    },
+    {
+      "openapi": {
+        "auth": {
+          "security_scheme": {
+            "connection_id": "/subscriptions/0ec6c427-01d3-4462-ae56-fd9656157157/resourceGroups/rg-law-aoai-eus2/providers/Microsoft.CognitiveServices/accounts/aif-law-aoai-eus2/projects/opsagents/connections/LogicApps_Tool_Connection_logiclawaoaieus2conlaw_3163"
+          },
+          "type": "connection"
+        },
+        "default_params": [
+          "api-version",
+          "sp",
+          "sv"
+        ],
+        "description": null,
+        "functions": [
+          {
+            "description": "This Logic App can run KQL queries against a Log Analytics workspace to pull out Windows & Linux event logs",
+            "name": "logiclawaoaieus2conlaw_Tool_When_an_HTTP_request_is_received-invoke",
+            "parameters": {
+              "properties": {
+                "kqlQuery": {
+                  "description": "The KQL query to run against the Log Analytics workspace",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kqlQuery"
+              ],
+              "type": "object"
+            }
+          }
+        ],
+        "name": "logiclawaoaieus2conlaw_Tool",
+        "spec": {
+          "components": {
+            "securitySchemes": {
+              "sig": {
+                "description": "The SHA 256 hash of the entire request URI with an internal key.",
+                "in": "query",
+                "name": "sig",
+                "type": "apiKey"
+              }
+            }
+          },
+          "info": {
+            "description": "This Logic App can run KQL queries against a Log Analytics workspace to pull out Windows & Linux event logs",
+            "title": "logic-law-aoai-eus2-con-law",
+            "version": "1.0.0.0"
+          },
+          "openapi": "3.0.3",
+          "paths": {
+            "/invoke": {
+              "post": {
+                "deprecated": false,
+                "description": "This Logic App can run KQL queries against a Log Analytics workspace to pull out Windows & Linux event logs",
+                "operationId": "When_an_HTTP_request_is_received-invoke",
+                "parameters": [
+                  {
+                    "description": "`2016-10-01` is the most common generally available version",
+                    "example": "2016-10-01",
+                    "in": "query",
+                    "name": "api-version",
+                    "required": true,
+                    "schema": {
+                      "default": "2016-10-01",
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "description": "The version number",
+                    "example": "1.0",
+                    "in": "query",
+                    "name": "sv",
+                    "required": true,
+                    "schema": {
+                      "default": "1.0",
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "description": "The permissions",
+                    "example": "%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun",
+                    "in": "query",
+                    "name": "sp",
+                    "required": true,
+                    "schema": {
+                      "default": "%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun",
+                      "type": "string"
+                    }
+                  }
+                ],
+                "requestBody": {
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "properties": {
+                          "kqlQuery": {
+                            "description": "The KQL query to run against the Log Analytics workspace",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kqlQuery"
+                        ],
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "required": true
+                },
+                "responses": {
+                  "200": {
+                    "content": {
+                      "application/json": {
+                        "schema": {
+                          "type": "object"
+                        }
+                      }
+                    },
+                    "description": "The Logic App Response."
+                  },
+                  "default": {
+                    "content": {
+                      "application/json": {
+                        "schema": {
+                          "type": "object"
+                        }
+                      }
+                    },
+                    "description": "The Logic App Response."
+                  }
+                }
+              }
+            }
+          },
+          "security": [
+            {
+              "sig": []
+            }
+          ],
+          "servers": [
+            {
+              "url": "https://prod-51.eastus2.logic.azure.com/workflows/b9a94cab6cd54f65867c980afb9065ee/triggers/When_an_HTTP_request_is_received/paths"
+            }
+          ]
+        }
+      },
+      "tags": [
+        "logicapps"
+      ],
+      "type": "openapi"
+    },
+    {
+      "type": "code_interpreter"
+    }
+  ],
+  "top_p": 1.0
+}

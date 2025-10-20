@@ -1,0 +1,180 @@
+{
+  "created_at": 1760968519,
+  "description": "Agent with access to Logic App workflow AgentHttpWorkflow",
+  "id": "asst_Y9POKbEJFD5HHQxToG70oV2j",
+  "instructions": "Invoke workflow AgentHttpWorkflow via the registered tool.",
+  "metadata": {},
+  "model": "gpt-4o",
+  "name": "LogicApp-AgentHttpWorkflow-Agent",
+  "object": "assistant",
+  "response_format": "auto",
+  "temperature": 1.0,
+  "tool_resources": {},
+  "tools": [
+    {
+      "openapi": {
+        "auth": {
+          "security_scheme": {
+            "connection_id": "/subscriptions/0ec6c427-01d3-4462-ae56-fd9656157157/resourceGroups/rg-m365-agents/providers/Microsoft.CognitiveServices/accounts/aifoundry1309/projects/project1309/connections/logicapp_workflow_tool_connection"
+          },
+          "type": "connection"
+        },
+        "description": "Logic App workflow AgentHttpWorkflow",
+        "functions": [
+          {
+            "description": "Invoke Logic App workflow AgentHttpWorkflow",
+            "name": "logicapp_workflow_tool_invoke_AgentHttpWorkflow",
+            "parameters": {
+              "properties": {
+                "api-version": {
+                  "default": "2022-05-01",
+                  "description": "API version for the request",
+                  "type": "string"
+                },
+                "inputParam": {
+                  "description": "Input parameter for the workflow",
+                  "type": "string"
+                },
+                "sp": {
+                  "default": "/triggers/When_an_HTTP_request_is_received/run",
+                  "description": "The permissions",
+                  "type": "string"
+                },
+                "sv": {
+                  "default": "1.0",
+                  "description": "The version number",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "inputParam",
+                "api-version",
+                "sv",
+                "sp"
+              ],
+              "type": "object"
+            }
+          }
+        ],
+        "name": "logicapp_workflow_tool",
+        "spec": {
+          "components": {
+            "securitySchemes": {
+              "sig": {
+                "description": "The SHA 256 hash signature for Logic Apps authentication",
+                "in": "query",
+                "name": "sig",
+                "type": "apiKey"
+              }
+            }
+          },
+          "info": {
+            "description": "Auto-generated OpenAPI spec for Logic App workflow HTTP trigger",
+            "title": "Logic App Workflow AgentHttpWorkflow",
+            "version": "1.0.0"
+          },
+          "openapi": "3.0.3",
+          "paths": {
+            "/invoke": {
+              "post": {
+                "description": "Invoke Logic App workflow AgentHttpWorkflow",
+                "operationId": "invoke_AgentHttpWorkflow",
+                "parameters": [
+                  {
+                    "description": "API version for the request",
+                    "in": "query",
+                    "name": "api-version",
+                    "required": true,
+                    "schema": {
+                      "default": "2022-05-01",
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "description": "The version number",
+                    "in": "query",
+                    "name": "sv",
+                    "required": true,
+                    "schema": {
+                      "default": "1.0",
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "description": "The permissions",
+                    "in": "query",
+                    "name": "sp",
+                    "required": true,
+                    "schema": {
+                      "default": "/triggers/When_an_HTTP_request_is_received/run",
+                      "type": "string"
+                    }
+                  }
+                ],
+                "requestBody": {
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "properties": {
+                          "inputParam": {
+                            "description": "Input parameter for the workflow",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "inputParam"
+                        ],
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "required": true
+                },
+                "responses": {
+                  "200": {
+                    "content": {
+                      "application/json": {
+                        "schema": {
+                          "properties": {
+                            "echo": {
+                              "description": "Echoed input parameter",
+                              "type": "string"
+                            },
+                            "timestamp": {
+                              "description": "UTC timestamp of the response",
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "workflow": {
+                              "description": "Name of the workflow that processed the request",
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        }
+                      }
+                    },
+                    "description": "Success"
+                  }
+                },
+                "summary": "Invoke Logic App workflow AgentHttpWorkflow"
+              }
+            }
+          },
+          "security": [
+            {
+              "sig": []
+            }
+          ],
+          "servers": [
+            {
+              "url": "https://logic-1309.azurewebsites.net:443/api/AgentHttpWorkflow/triggers/When_an_HTTP_request_is_received/invoke"
+            }
+          ]
+        }
+      },
+      "type": "openapi"
+    }
+  ],
+  "top_p": 1.0
+}

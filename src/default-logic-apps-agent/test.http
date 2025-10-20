@@ -1,0 +1,57 @@
+### Test Logic App Workflow - AgentHttpWorkflow
+### Manual trigger with HTTP request
+
+# Test 1: Basic invocation with valid input
+POST https://logic-1309.azurewebsites.net:443/api/AgentHttpWorkflow/triggers/When_an_HTTP_request_is_received/invoke?api-version=2022-05-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=yOcbipDrgZRFmM7rxlE18GQ52XKmXB7z0Qxn6LX2Hhg
+Content-Type: application/json
+
+{
+  "inputParam": "Hello from test client"
+}
+
+###
+
+# Test 2: Execute workflow command (as AI agent would call it)
+POST https://logic-1309.azurewebsites.net:443/api/AgentHttpWorkflow/triggers/When_an_HTTP_request_is_received/invoke?api-version=2022-05-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=yOcbipDrgZRFmM7rxlE18GQ52XKmXB7z0Qxn6LX2Hhg
+Content-Type: application/json
+
+{
+  "inputParam": "Execute workflow"
+}
+
+###
+
+# Test 3: Different test message
+POST https://logic-1309.azurewebsites.net:443/api/AgentHttpWorkflow/triggers/When_an_HTTP_request_is_received/invoke?api-version=2022-05-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=yOcbipDrgZRFmM7rxlE18GQ52XKmXB7z0Qxn6LX2Hhg
+Content-Type: application/json
+
+{
+  "inputParam": "Testing Logic App integration"
+}
+
+###
+
+# Test 4: Empty string input (to test validation)
+POST https://logic-1309.azurewebsites.net:443/api/AgentHttpWorkflow/triggers/When_an_HTTP_request_is_received/invoke?api-version=2022-05-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=yOcbipDrgZRFmM7rxlE18GQ52XKmXB7z0Qxn6LX2Hhg
+Content-Type: application/json
+
+{
+  "inputParam": ""
+}
+
+###
+
+# Expected Response Format:
+# {
+#   "echo": "<your-input-parameter>",
+#   "workflow": "AgentHttpWorkflow",
+#   "timestamp": "2025-10-20T12:34:56.789Z"
+# }
+
+###
+
+# Notes:
+# - The callback URL includes SAS token authentication (sp, sv, sig parameters)
+# - The workflow echoes back the inputParam along with workflow name and timestamp
+# - Content-Type must be application/json
+# - The inputParam field is required by the workflow schema
