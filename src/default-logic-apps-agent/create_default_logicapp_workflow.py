@@ -1,20 +1,20 @@
 #!/usr/bin/env -S uv run
 """Deploy a simple Logic App workflow and register it as an OpenAPI tool.
 
-Workflow: HTTP trigger + echo style response.
+Outputs a JSON document to stdout containing:
+  - ai_foundry_agent_id
+  - callback_url
+  - logic_app_name, workflow_name, tool_name
+  - ai_foundry_project_endpoint, ai_model_deployment_name
 
-Core steps:
-1. Build minimal Logic App artifact (host.json + workflow.json).
-2. Use management APIs for publishing creds + Kudu zip deploy.
-3. Fetch manual trigger callback URL (includes SAS sig).
-4. Create CustomKeys connection (stores sig) + register OpenAPI tool.
+Use shell redirection to capture the JSON and extract fields with `jq`.
 
 Prereqs:
 * Existing Logic App Standard site (name, RG, subscription).
 * Packages: azure-identity, requests, azure-ai-agents.
 * DefaultAzureCredential must work (login or managed identity).
 
-Example (uv):
+Example:
     uv run create_default_logicapp_workflow.py \
         --subscription-id <SUB> \
         --resource-group <RG> \
@@ -23,6 +23,7 @@ Example (uv):
         --ai-foundry-project <project_url> \
         --ai-model-deployment-name gpt-4o
 """
+# flake8: max-line-length=120
 from __future__ import annotations
 
 import argparse
@@ -66,7 +67,9 @@ def load_workflow_template() -> dict:
     script_dir = Path(__file__).parent
     workflow_file = script_dir / "workflow_definition.json"
     if not workflow_file.exists():
-        raise FileNotFoundError(f"Workflow definition file not found: {workflow_file}")
+        raise FileNotFoundError(
+            f"Workflow definition file not found: {workflow_file}"
+        )
     with open(workflow_file, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -96,9 +99,16 @@ def build_zip_package(workflow_name: str) -> bytes:
         "kind": "Stateful"
     }
     mem_file = io.BytesIO()
-    with zipfile.ZipFile(mem_file, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("host.json", json.dumps(host_json, indent=2))
-        zf.writestr(f"{workflow_name}/workflow.json", json.dumps(workflow_content, indent=2))
+    with zipfile.ZipFile(
+        mem_file, mode="w", compression=zipfile.ZIP_DEFLATED
+    ) as zf:
+        zf.writestr(
+            "host.json", json.dumps(host_json, indent=2)
+        )
+        zf.writestr(
+            f"{workflow_name}/workflow.json",
+            json.dumps(workflow_content, indent=2),
+        )
     mem_file.seek(0)
     return mem_file.read()
 
@@ -115,12 +125,20 @@ def get_publishing_credentials(
     token: str,
 ) -> Tuple[str, str]:
     url = (
-        f"{MGMT_BASE}/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/"
-        f"Microsoft.Web/sites/{site_name}/config/publishingcredentials/list?api-version={MGMT_API_VERSION_WEB}"
+        f"{MGMT_BASE}/subscriptions/{subscription_id}/resourceGroups/"
+        f"{resource_group}/providers/Microsoft.Web/sites/{site_name}/config/"
+        "publishingcredentials/list"
+        f"?api-version={MGMT_API_VERSION_WEB}"
     )
-    resp = requests.post(url, headers={"Authorization": f"Bearer {token}"}, timeout=30)
+    resp = requests.post(
+        url,
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=30,
+    )
     if resp.status_code >= 300:
-        raise RuntimeError(f"Failed publishing credentials: {resp.status_code} {resp.text}")
+        raise RuntimeError(
+            f"Failed publishing credentials: {resp.status_code} {resp.text}"
+        )
     props = resp.json().get("properties", {})
     user = props.get("publishingUserName")
     pwd = props.get("publishingPassword")
@@ -134,10 +152,16 @@ def zip_deploy(site_name: str, user: str, pwd: str, zip_bytes: bytes) -> None:
     auth = base64.b64encode(f"{user}:{pwd}".encode()).decode()
     headers = {"Authorization": f"Basic {auth}"}
     log("Uploading ZIP package via Kudu Zip Deploy...")
-    resp = requests.post(deploy_url, headers=headers, data=zip_bytes, timeout=300)
+    resp = requests.post(
+        deploy_url, headers=headers, data=zip_bytes, timeout=300
+    )
     if resp.status_code >= 300:
-        raise RuntimeError(f"Zip Deploy failed: {resp.status_code} {resp.text}")
-    status_url = f"https://{site_name}.scm.azurewebsites.net/api/deployments/latest"
+        raise RuntimeError(
+            f"Zip Deploy failed: {resp.status_code} {resp.text}"
+        )
+    status_url = (
+        f"https://{site_name}.scm.azurewebsites.net/api/deployments/latest"
+    )
     for attempt in range(30):
         time.sleep(2)
         st = requests.get(status_url, headers=headers, timeout=15)
@@ -159,13 +183,22 @@ def get_trigger_callback_url(
     token: str,
 ) -> str:
     url = (
-        f"{MGMT_BASE}/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/"
-        f"Microsoft.Web/sites/{site_name}/hostruntime/runtime/webhooks/workflow/api/management/workflows/"
-        f"{workflow_name}/triggers/When_an_HTTP_request_is_received/listCallbackUrl?api-version={MGMT_API_VERSION_WORKFLOW}"
+        f"{MGMT_BASE}/subscriptions/{subscription_id}/resourceGroups/"
+        f"{resource_group}/providers/Microsoft.Web/sites/{site_name}/"
+        "hostruntime/runtime/webhooks/workflow/api/management/workflows/"
+        f"{workflow_name}/triggers/When_an_HTTP_request_is_received/"
+        "listCallbackUrl"
+        f"?api-version={MGMT_API_VERSION_WORKFLOW}"
     )
-    resp = requests.post(url, headers={"Authorization": f"Bearer {token}"}, timeout=30)
+    resp = requests.post(
+        url,
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=30,
+    )
     if resp.status_code >= 300:
-        raise RuntimeError(f"Failed listing callback URL: {resp.status_code} {resp.text}")
+        raise RuntimeError(
+            f"Failed listing callback URL: {resp.status_code} {resp.text}"
+        )
     value = resp.json().get("value")
     if not value:
         raise RuntimeError("Callback URL missing in response")
@@ -176,17 +209,23 @@ def load_openapi_template() -> dict:
     script_dir = Path(__file__).parent
     openapi_file = script_dir / "openapi_spec_template.json"
     if not openapi_file.exists():
-        raise FileNotFoundError(f"OpenAPI spec template file not found: {openapi_file}")
+        raise FileNotFoundError(
+            f"OpenAPI spec template file not found: {openapi_file}"
+        )
     with open(openapi_file, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def build_openapi_spec(workflow_name: str, callback_url: str) -> tuple[dict, dict]:
+def build_openapi_spec(
+    workflow_name: str, callback_url: str
+) -> tuple[dict, dict]:
     from urllib.parse import parse_qs, quote, urlparse
     spec = load_openapi_template()
     parsed = urlparse(callback_url)
     query_params = parse_qs(parsed.query)
-    api_version = query_params.get("api-version", ["2016-10-01"])[0] or "2016-10-01"
+    api_version = (
+        query_params.get("api-version", ["2016-10-01"])[0] or "2016-10-01"
+    )
     sv = query_params.get("sv", ["1.0"])[0]
     sp_raw = query_params.get("sp", [""])[0]
     sig = query_params.get("sig", [""])[0]
@@ -194,9 +233,11 @@ def build_openapi_spec(workflow_name: str, callback_url: str) -> tuple[dict, dic
         raise ValueError("No 'sig' parameter found in callback URL")
     sp = quote(sp_raw, safe="") if sp_raw else quote(
         "/triggers/When_an_HTTP_request_is_received/run", safe="")
-    # Build server base URL without :443 port and without trailing /invoke segment.
+    # Build server base URL without :443 and without trailing /invoke.
     clean_netloc = parsed.netloc.replace(":443", "")
-    path_no_invoke = parsed.path[:-7] if parsed.path.endswith("/invoke") else parsed.path
+    path_no_invoke = (
+        parsed.path[:-7] if parsed.path.endswith("/invoke") else parsed.path
+    )
     base_url = f"{parsed.scheme}://{clean_netloc}{path_no_invoke}"
     post_op = spec["paths"]["/invoke"]["post"]
     post_op["operationId"] = "When_an_HTTP_request_is_received-invoke"
@@ -221,7 +262,9 @@ def parse_project_endpoint(project_endpoint: str) -> tuple[str, str]:
     account_name = host.split(".")[0] if host else ""
     parts = [p for p in parsed.path.split("/") if p]
     if len(parts) < 2 or parts[-2] != "projects":
-        raise ValueError(f"Unexpected project endpoint format: {project_endpoint}.")
+        raise ValueError(
+            f"Unexpected project endpoint format: {project_endpoint}."
+        )
     project_name = parts[-1]
     if not account_name or not project_name:
         raise ValueError("Missing account or project name in endpoint")
@@ -241,7 +284,8 @@ def create_or_update_custom_key_connection(
         "https://management.azure.com/subscriptions/"
         f"{subscription_id}/resourceGroups/{resource_group}/providers/"
         "Microsoft.CognitiveServices/accounts/"
-        f"{account_name}/projects/{project_name}/connections/{connection_name}?api-version=2025-04-01-preview"
+        f"{account_name}/projects/{project_name}/connections/{connection_name}"
+        "?api-version=2025-04-01-preview"
     )
     payload = {
         "properties": {
@@ -253,11 +297,16 @@ def create_or_update_custom_key_connection(
             "metadata": {},
         }
     }
-    headers = {"Authorization": f"Bearer {management_token}", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {management_token}",
+        "Content-Type": "application/json",
+    }
     log(f"Creating/updating CustomKeys connection '{connection_name}'...")
     resp = requests.put(url, headers=headers, json=payload, timeout=60)
     if resp.status_code not in (200, 201):
-        raise RuntimeError(f"Conn {connection_name} failed: {resp.status_code} {resp.text}")
+        raise RuntimeError(
+            f"Conn {connection_name} failed: {resp.status_code} {resp.text}"
+        )
     log(f"Connection '{connection_name}' ready (status {resp.status_code}).")
 
 
@@ -269,7 +318,8 @@ def register_openapi_tool(
     model_deployment_name: str,
     subscription_id: str,
     resource_group: str,
-) -> None:
+) -> str:
+    """Register (or update) an agent with an OpenAPI tool; return agent id."""
     log("Registering OpenAPI tool in AI Foundry...")
     credential = DefaultAzureCredential()
     if not project.startswith("https://"):
@@ -292,29 +342,35 @@ def register_openapi_tool(
         management_token,
     )
     connection_id = (
-        f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/"
-        f"Microsoft.CognitiveServices/accounts/{account_name}/projects/{project_name}/connections/{connection_name}"
+        f"/subscriptions/{subscription_id}/resourceGroups/"
+        f"{resource_group}/providers/Microsoft.CognitiveServices/accounts/"
+        f"{account_name}/projects/{project_name}/connections/{connection_name}"
     )
     connection_auth = OpenApiConnectionAuthDetails(
-        security_scheme=OpenApiConnectionSecurityScheme(connection_id=connection_id)
+        security_scheme=OpenApiConnectionSecurityScheme(
+            connection_id=connection_id
+        )
     )
-    # Extract default params & functions list from template (logic2.json pattern)
-    default_params = openapi_spec.get("default_params", ["api-version", "sp", "sv"])
+    default_params = openapi_spec.get(
+        "default_params",
+        ["api-version", "sp", "sv"],
+    )
     functions = openapi_spec.get("functions", [])
-    # Use first function entry for name/description; fall back if missing.
     fn0 = functions[0] if functions else {}
-    raw_fn_name = fn0.get("name") or f"{tool_name}_Tool_When_an_HTTP_request_is_received_invoke"
-    raw_fn_desc = fn0.get("description") or f"Logic App workflow {workflow_name}"
+    raw_fn_name = (
+        fn0.get("name")
+        or f"{tool_name}_Tool_When_an_HTTP_request_is_received_invoke"
+    )
+    raw_fn_desc = (
+        fn0.get("description")
+        or f"Logic App workflow {workflow_name}"
+    )
     fn_name = raw_fn_name.replace("PLACEHOLDER", workflow_name)
     fn_desc = raw_fn_desc.replace("PLACEHOLDER", workflow_name)
-    # Sanitize tool function name to pattern ^[a-zA-Z0-9_]+$
     fn_name = re.sub(r"[^a-zA-Z0-9_]", "_", fn_name)
-    # Collapse multiple consecutive underscores
     fn_name = re.sub(r"_+", "_", fn_name).strip("_") or "logicapp_tool"
-    # Ensure doesn't start with digit
     if fn_name and fn_name[0].isdigit():
         fn_name = f"_{fn_name}"
-
     openapi_function = OpenApiFunctionDefinition(
         name=fn_name,
         description=fn_desc,
@@ -332,81 +388,151 @@ def register_openapi_tool(
         client.update_agent(
             agent_id=existing_agent.id,
             name=agent_name,
-            description=f"Agent with access to Logic App workflow {workflow_name}",
-            instructions=f"Invoke workflow {workflow_name} via the registered tool.",
+            description=(
+                f"Agent with access to Logic App workflow {workflow_name}"
+            ),
+            instructions=(
+                f"Invoke workflow {workflow_name} via the registered tool."
+            ),
             tools=[tool_definition],
             model=model_deployment_name,
         )
         log(f"Agent updated: {existing_agent.id}")
+        agent_id = existing_agent.id
     else:
         log(f"Creating new agent: {agent_name}")
         agent = client.create_agent(
             model=model_deployment_name,
             name=agent_name,
-            description=f"Agent with access to Logic App workflow {workflow_name}",
-            instructions=f"Invoke workflow {workflow_name} via the registered tool.",
+            description=(
+                f"Agent with access to Logic App workflow {workflow_name}"
+            ),
+            instructions=(
+                f"Invoke workflow {workflow_name} via the registered tool."
+            ),
             tools=[tool_definition],
         )
         log(f"Agent created: {agent.id}")
+        agent_id = agent.id
     log("OpenAPI tool registered successfully.")
+    return agent_id
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Deploy Logic App workflow and register OpenAPI tool.")
-    p.add_argument("--subscription-id", required=True)
-    p.add_argument("--resource-group", required=True)
-    p.add_argument("--logic-app-name", required=True,
-                   help="Name of the Logic App Standard site (App Service)")
+    p = argparse.ArgumentParser(
+        description=(
+            "Deploy Logic App workflow and register OpenAPI tool. "
+            "Print a JSON payload with agent and workflow metadata."
+        )
+    )
+    # Required args
+    p.add_argument("--subscription-id", required=True, dest="subscription_id")
+    p.add_argument("--resource-group", required=True, dest="resource_group")
+    p.add_argument(
+        "--logic-app-name",
+        required=True,
+        dest="logic_app_name",
+        help="Logic App Standard site name",
+    )
+    p.add_argument(
+        "--ai-foundry-project",
+        required=True,
+        dest="ai_foundry_project",
+        help="AI Foundry project endpoint base URL",
+    )
+    p.add_argument(
+        "--ai-model-deployment-name",
+        required=True,
+        dest="ai_model_deployment_name",
+        help="Model deployment name (e.g. gpt-4o)",
+    )
+    # Optional / defaults
     p.add_argument("--workflow-name", default="AgentHttpWorkflow")
-    p.add_argument("--ai-foundry-project", required=True, help="Project endpoint base URL")
-    p.add_argument("--ai-model-deployment-name", required=True,
-                   help="Model deployment name (e.g. gpt-4o)")
-    p.add_argument("--tool-name", default="logicapp_workflow_tool",
-                   help="Tool name for OpenAPI registration")
-    p.add_argument("--debug", action="store_true",
-                   help="Print full traceback on error for troubleshooting")
+    p.add_argument(
+        "--tool-name",
+        default="logicapp_workflow_tool",
+        help="Tool name for OpenAPI registration",
+    )
+    p.add_argument(
+        "--debug",
+        action="store_true",
+        help="Print full traceback on error for troubleshooting",
+    )
     return p.parse_args(argv)
 
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
+    subscription_id = args.subscription_id
+    resource_group = args.resource_group
+    logic_app_name = args.logic_app_name
+    ai_foundry_project = args.ai_foundry_project
+    ai_model_deployment_name = args.ai_model_deployment_name
+    workflow_name = args.workflow_name
+    tool_name = args.tool_name
+
     try:
+        # Cast to str to ensure correct types for downstream function calls
+        subscription_id = str(subscription_id)
+        resource_group = str(resource_group)
+        logic_app_name = str(logic_app_name)
+        ai_foundry_project = str(ai_foundry_project)
+        ai_model_deployment_name = str(ai_model_deployment_name)
         token = get_access_token()
         log("Acquired management access token.")
         user, pwd = get_publishing_credentials(
-            args.subscription_id,
-            args.resource_group,
-            args.logic_app_name,
+            subscription_id,
+            resource_group,
+            logic_app_name,
             token,
         )
         log("Retrieved publishing credentials.")
-        zip_bytes = build_zip_package(args.workflow_name)
-        zip_deploy(args.logic_app_name, user, pwd, zip_bytes)
+        zip_bytes = build_zip_package(workflow_name)
+        zip_deploy(logic_app_name, user, pwd, zip_bytes)
         callback_url = get_trigger_callback_url(
-            args.subscription_id,
-            args.resource_group,
-            args.logic_app_name,
-            args.workflow_name,
+            subscription_id,
+            resource_group,
+            logic_app_name,
+            workflow_name,
             token,
         )
-        log(f"Workflow deployed. Manual trigger callback URL:\n{callback_url}")
-        register_openapi_tool(
-            project=args.ai_foundry_project,
-            workflow_name=args.workflow_name,
-            callback_url=callback_url,
-            tool_name=args.tool_name,
-            model_deployment_name=args.ai_model_deployment_name,
-            subscription_id=args.subscription_id,
-            resource_group=args.resource_group,
+        log(
+            "Workflow deployed. Manual trigger callback URL:\n"
+            f"{callback_url}"
         )
-        log("Done.")
+        # Register tool & capture agent id
+        agent_id = register_openapi_tool(
+            project=ai_foundry_project,
+            workflow_name=workflow_name,
+            callback_url=callback_url,
+            tool_name=tool_name,
+            model_deployment_name=ai_model_deployment_name,
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+        )
+        output_payload = {
+            "ai_foundry_project_endpoint": ai_foundry_project,
+            "ai_model_deployment_name": ai_model_deployment_name,
+            "ai_foundry_agent_id": agent_id,
+            "logic_app_name": logic_app_name,
+            "workflow_name": workflow_name,
+            "tool_name": tool_name,
+            "callback_url": callback_url,
+        }
+        log("Emitting deployment output JSON")
+        print(json.dumps(output_payload, indent=2))
         return 0
     except AzureError as az_ex:
         log(f"AzureError: {az_ex}")
         if args.debug:
             traceback.print_exc()
         return 1
-    except (RuntimeError, ValueError, AzureError, requests.RequestException) as ex:
+    except (
+        RuntimeError,
+        ValueError,
+        AzureError,
+        requests.RequestException,
+    ) as ex:
         log(f"Error: {ex}")
         if args.debug:
             traceback.print_exc()

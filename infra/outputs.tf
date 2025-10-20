@@ -22,3 +22,14 @@ output "ai_model_deployment_name" {
   description = "Name of the AI model deployment (gpt-4o)"
   value       = module.ai_foundry.ai_model_deployment_name
 }
+
+# ACR outputs promoted for build/push scripting (previously only accessible via module references)
+output "acr_login_server" {
+  description = "Login server (FQDN) of the Azure Container Registry"
+  value       = module.acr.acr_login_server
+}
+
+output "acr_name" {
+  description = "Name of the Azure Container Registry"
+  value       = module.acr.acr_name
+}
