@@ -12,8 +12,15 @@ This module deploys a fully network-isolated Logic Apps Standard (WS1 SKU) insta
 - **SKU**: Standard LRS
 - **Network**: Deny public access, Azure Services bypass enabled
 - **Access**: Shared access keys enabled (required for Logic Apps)
+- **File Share**: Dedicated file share for Logic Apps content storage
 
-### 2. App Service Plan (`asp-logicapps-{suffix}`)
+### 2. File Share (`logic-apps-content-{suffix}`)
+
+- **Purpose**: Stores Logic Apps configuration and workflow definitions
+- **Quota**: 5120 GB (5 TB)
+- **Access**: Private via file private endpoint only
+
+### 3. App Service Plan (`asp-logicapps-{suffix}`)
 
 - **SKU**: WS1 (Workflow Standard 1)
 - **OS**: Windows
@@ -29,8 +36,23 @@ This module deploys a fully network-isolated Logic Apps Standard (WS1 SKU) insta
 
 ### 4. Private Endpoints
 
-- **Storage Account PE**: For blob subresource
+- **Storage Account Blob PE**: For blob subresource access
+- **Storage Account File PE**: For file share access (required for VNet-integrated Logic Apps)
 - **Logic App PE**: For sites subresource
+
+## Private Storage Requirements for VNet Integration
+
+When Logic Apps Standard is VNet-integrated with a private storage account (public access disabled), specific configuration is required:
+
+1. **File Share**: A dedicated file share must be created for Logic Apps content
+2. **File Private Endpoint**: A private endpoint for the `file` subresource is required
+3. **Connection Strings**: App settings must reference the storage account using connection strings:
+   - `WEBSITE_CONTENTAZUREFILECONNECTIONSTRING` - Connection string to the storage account
+   - `WEBSITE_CONTENTSHARE` - Name of the file share
+   - `AzureWebJobsStorage` - Connection string for Azure Functions runtime
+4. **WEBSITE_CONTENTOVERVNET**: Must be set to `1` to enable content access over VNet
+
+These requirements are automatically configured by this module based on [Microsoft's guidance for Logic Apps with secure storage](https://learn.microsoft.com/en-us/azure/logic-apps/secure-single-tenant-workflow-virtual-network-private-endpoint).
 
 ## Network Architecture
 
@@ -129,6 +151,7 @@ The module exposes these outputs for use in other modules:
 - `logic_app_default_hostname` - Default hostname (for reference)
 - `storage_account_id` - Storage account resource ID
 - `storage_account_name` - Storage account name
+- `storage_share_name` - Name of the Logic Apps content file share
 - `app_service_plan_id` - App Service Plan resource ID
 
 ## Next Steps

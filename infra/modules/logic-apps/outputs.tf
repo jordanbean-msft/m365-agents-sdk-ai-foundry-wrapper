@@ -28,6 +28,11 @@ output "storage_account_name" {
   value       = azurerm_storage_account.logic_apps_storage.name
 }
 
+output "storage_share_name" {
+  description = "Name of the Logic Apps content file share"
+  value       = azurerm_storage_share.logic_apps_content.name
+}
+
 output "app_service_plan_id" {
   description = "ID of the App Service Plan"
   value       = azurerm_service_plan.logic_apps_plan.id
