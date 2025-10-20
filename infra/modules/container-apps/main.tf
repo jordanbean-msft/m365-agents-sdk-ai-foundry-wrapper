@@ -89,6 +89,14 @@ resource "azurerm_container_app" "main" {
         name  = "AZURE_CLIENT_ID"
         value = var.azure_client_id
       }
+
+      dynamic "env" {
+        for_each = var.application_insights_connection_string != null ? [1] : []
+        content {
+          name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+          value = var.application_insights_connection_string
+        }
+      }
     }
 
     min_replicas = 1

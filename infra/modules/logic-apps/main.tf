@@ -204,18 +204,23 @@ resource "azurerm_logic_app_standard" "logic_app" {
   public_network_access = "Disabled"
 
   ## App settings
-  app_settings = {
-    "FUNCTIONS_WORKER_RUNTIME"                 = "dotnet"
-    "WEBSITE_NODE_DEFAULT_VERSION"             = "~22"
-    "WEBSITE_CONTENTOVERVNET"                  = "1"
-    "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING" = "DefaultEndpointsProtocol=https;AccountName=${azurerm_storage_account.logic_apps_storage.name};AccountKey=${azurerm_storage_account.logic_apps_storage.primary_access_key};EndpointSuffix=core.windows.net"
-    "WEBSITE_CONTENTSHARE"                     = azurerm_storage_share.logic_apps_content.name
-    "AzureWebJobsStorage"                      = "DefaultEndpointsProtocol=https;AccountName=${azurerm_storage_account.logic_apps_storage.name};AccountKey=${azurerm_storage_account.logic_apps_storage.primary_access_key};EndpointSuffix=core.windows.net"
-    "WEBSITE_AUTH_AAD_ALLOWED_TENANTS"         = "*"
-    "WEBSITE_AUTH_AAD_REQUIRE_HTTPS"           = "true"
-    "WEBSITE_DNS_SERVER"                       = var.website_dns_server
-    "WEBSITE_VNET_ROUTE_ALL"                   = "1"
-  }
+  app_settings = merge(
+    {
+      "FUNCTIONS_WORKER_RUNTIME"                 = "dotnet"
+      "WEBSITE_NODE_DEFAULT_VERSION"             = "~22"
+      "WEBSITE_CONTENTOVERVNET"                  = "1"
+      "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING" = "DefaultEndpointsProtocol=https;AccountName=${azurerm_storage_account.logic_apps_storage.name};AccountKey=${azurerm_storage_account.logic_apps_storage.primary_access_key};EndpointSuffix=core.windows.net"
+      "WEBSITE_CONTENTSHARE"                     = azurerm_storage_share.logic_apps_content.name
+      "AzureWebJobsStorage"                      = "DefaultEndpointsProtocol=https;AccountName=${azurerm_storage_account.logic_apps_storage.name};AccountKey=${azurerm_storage_account.logic_apps_storage.primary_access_key};EndpointSuffix=core.windows.net"
+      "WEBSITE_AUTH_AAD_ALLOWED_TENANTS"         = "*"
+      "WEBSITE_AUTH_AAD_REQUIRE_HTTPS"           = "true"
+      "WEBSITE_DNS_SERVER"                       = var.website_dns_server
+      "WEBSITE_VNET_ROUTE_ALL"                   = "1"
+    },
+    var.application_insights_connection_string != null ? {
+      "APPLICATIONINSIGHTS_CONNECTION_STRING" = var.application_insights_connection_string
+    } : {}
+  )
 
   ## Site configuration
   site_config {

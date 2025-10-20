@@ -67,6 +67,12 @@ variable "log_analytics_workspace_id" {
   type        = string
 }
 
+variable "application_insights_id" {
+  description = "Resource ID of an existing Application Insights resource to create connections to (optional). Connection string will be fetched automatically. Example: /subscriptions/xxxx/resourceGroups/rg/providers/Microsoft.Insights/components/appinsights"
+  type        = string
+  default     = null
+}
+
 variable "common_tags" {
   description = "A map of tags to apply to all Azure resources (where supported). Provider default tags cover azurerm resources; critical azapi resources are tagged explicitly."
   type        = map(string)

@@ -71,7 +71,39 @@ resource "azurerm_cognitive_deployment" "aifoundry_deployment_gpt_4o" {
   }
 }
 
+## Create the AI Foundry account-level connection to Application Insights (if provided)
+##
+resource "azapi_resource" "conn_app_insights" {
+  count                     = var.application_insights_id != null ? 1 : 0
+  type                      = "Microsoft.CognitiveServices/accounts/connections@2025-06-01"
+  name                      = element(split("/", var.application_insights_id), length(split("/", var.application_insights_id)) - 1)
+  parent_id                 = azapi_resource.ai_foundry.id
+  schema_validation_enabled = false
+
+  depends_on = [
+    azapi_resource.ai_foundry
+  ]
+
+  body = {
+    name = element(split("/", var.application_insights_id), length(split("/", var.application_insights_id)) - 1)
+    properties = {
+      category = "AppInsights"
+      target   = var.application_insights_id
+      authType = "ApiKey"
+      credentials = {
+        key = var.application_insights_connection_string
+      }
+      metadata = {
+        ResourceId = var.application_insights_id
+        location   = var.location
+      }
+    }
+  }
+}
+
 ## Diagnostic Settings for AI Foundry (Cognitive Services Account)
+## Note: Diagnostic settings send logs to Log Analytics/Application Insights.
+## Application Insights connections (above) are separate and integrate AI Foundry with App Insights for tracing.
 resource "azurerm_monitor_diagnostic_setting" "ai_foundry" {
   count                      = var.enable_diagnostics ? 1 : 0
   name                       = "${azapi_resource.ai_foundry.name}-diag"

@@ -39,3 +39,16 @@ variable "enable_diagnostics" {
   type        = bool
   default     = true
 }
+
+variable "application_insights_id" {
+  description = "ID of the Application Insights resource (optional). Name will be extracted from the ID."
+  type        = string
+  default     = null
+}
+
+variable "application_insights_connection_string" {
+  description = "Connection string of the Application Insights resource (optional)"
+  type        = string
+  default     = null
+  sensitive   = true
+}

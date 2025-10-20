@@ -57,14 +57,16 @@ module "ai_foundry" {
     azurerm = azurerm.workload_subscription
   }
 
-  unique_suffix              = module.foundation.unique_suffix
-  resource_group_name        = var.resource_group_name_resources
-  location                   = var.location
-  subscription_id            = var.subscription_id_resources
-  subnet_id_agent            = var.subnet_id_agent
-  log_analytics_workspace_id = var.log_analytics_workspace_id
-  common_tags                = var.common_tags
-  enable_diagnostics         = var.enable_diagnostics
+  unique_suffix                          = module.foundation.unique_suffix
+  resource_group_name                    = var.resource_group_name_resources
+  location                               = var.location
+  subscription_id                        = var.subscription_id_resources
+  subnet_id_agent                        = var.subnet_id_agent
+  log_analytics_workspace_id             = var.log_analytics_workspace_id
+  application_insights_id                = var.application_insights_id
+  application_insights_connection_string = var.application_insights_id != null ? data.azurerm_application_insights.existing[0].connection_string : null
+  common_tags                            = var.common_tags
+  enable_diagnostics                     = var.enable_diagnostics
 }
 
 ## Networking module - Creates private endpoints
@@ -110,23 +112,25 @@ module "project" {
     module.networking
   ]
 
-  unique_suffix                         = module.foundation.unique_suffix
-  resource_group_name                   = var.resource_group_name_resources
-  location                              = var.location
-  ai_foundry_id                         = module.ai_foundry.ai_foundry_id
-  storage_account_id                    = module.storage.storage_account_id
-  storage_account_name                  = module.storage.storage_account_name
-  storage_account_primary_blob_endpoint = module.storage.storage_account_primary_blob_endpoint
-  cosmosdb_id                           = module.storage.cosmosdb_id
-  cosmosdb_name                         = module.storage.cosmosdb_name
-  cosmosdb_endpoint                     = module.storage.cosmosdb_endpoint
-  ai_search_id                          = module.storage.ai_search_id
-  ai_search_name                        = module.storage.ai_search_name
-  pe_storage_id                         = module.networking.pe_storage_id
-  pe_cosmosdb_id                        = module.networking.pe_cosmosdb_id
-  pe_aisearch_id                        = module.networking.pe_aisearch_id
-  pe_aifoundry_id                       = module.networking.pe_aifoundry_id
-  common_tags                           = var.common_tags
+  unique_suffix                          = module.foundation.unique_suffix
+  resource_group_name                    = var.resource_group_name_resources
+  location                               = var.location
+  ai_foundry_id                          = module.ai_foundry.ai_foundry_id
+  storage_account_id                     = module.storage.storage_account_id
+  storage_account_name                   = module.storage.storage_account_name
+  storage_account_primary_blob_endpoint  = module.storage.storage_account_primary_blob_endpoint
+  cosmosdb_id                            = module.storage.cosmosdb_id
+  cosmosdb_name                          = module.storage.cosmosdb_name
+  cosmosdb_endpoint                      = module.storage.cosmosdb_endpoint
+  ai_search_id                           = module.storage.ai_search_id
+  ai_search_name                         = module.storage.ai_search_name
+  pe_storage_id                          = module.networking.pe_storage_id
+  pe_cosmosdb_id                         = module.networking.pe_cosmosdb_id
+  pe_aisearch_id                         = module.networking.pe_aisearch_id
+  pe_aifoundry_id                        = module.networking.pe_aifoundry_id
+  application_insights_id                = var.application_insights_id
+  application_insights_connection_string = var.application_insights_id != null ? data.azurerm_application_insights.existing[0].connection_string : null
+  common_tags                            = var.common_tags
 }
 
 ## Logic Apps module - Creates Logic Apps Standard with private endpoints and VNet integration
@@ -142,17 +146,18 @@ module "logic_apps" {
     module.identity
   ]
 
-  unique_suffix                       = module.foundation.unique_suffix
-  resource_group_name                 = var.resource_group_name_resources
-  location                            = var.location
-  subnet_id_logic_apps                = var.subnet_id_logic_apps
-  subnet_id_private_endpoint          = var.subnet_id_private_endpoint
-  user_assigned_identity_id           = module.identity.user_assigned_identity_id
-  user_assigned_identity_principal_id = module.identity.user_assigned_identity_principal_id
-  website_dns_server                  = var.logic_apps_website_dns_server
-  log_analytics_workspace_id          = var.log_analytics_workspace_id
-  common_tags                         = var.common_tags
-  enable_diagnostics                  = var.enable_diagnostics
+  unique_suffix                          = module.foundation.unique_suffix
+  resource_group_name                    = var.resource_group_name_resources
+  location                               = var.location
+  subnet_id_logic_apps                   = var.subnet_id_logic_apps
+  subnet_id_private_endpoint             = var.subnet_id_private_endpoint
+  user_assigned_identity_id              = module.identity.user_assigned_identity_id
+  user_assigned_identity_principal_id    = module.identity.user_assigned_identity_principal_id
+  website_dns_server                     = var.logic_apps_website_dns_server
+  log_analytics_workspace_id             = var.log_analytics_workspace_id
+  application_insights_connection_string = var.application_insights_id != null ? data.azurerm_application_insights.existing[0].connection_string : null
+  common_tags                            = var.common_tags
+  enable_diagnostics                     = var.enable_diagnostics
 }
 
 ## Identity module - User Assigned Managed Identity for Container Apps
@@ -206,23 +211,24 @@ module "container_apps" {
     module.identity
   ]
 
-  unique_suffix                    = module.foundation.unique_suffix
-  resource_group_name              = var.resource_group_name_resources
-  location                         = var.location
-  subnet_id_container_apps         = var.subnet_id_container_apps
-  container_image                  = var.container_image
-  service_connection_client_id     = var.service_connection_client_id
-  service_connection_client_secret = var.service_connection_client_secret
-  tenant_id                        = var.tenant_id
-  ai_project_endpoint              = module.ai_foundry.ai_foundry_endpoint
-  ai_foundry_agent_id              = var.ai_foundry_agent_id
-  ai_model_deployment_name         = module.ai_foundry.ai_model_deployment_name
-  azure_client_id                  = module.identity.user_assigned_identity_client_id
-  registry_server                  = module.acr.acr_login_server
-  user_assigned_identity_id        = module.identity.user_assigned_identity_id
-  log_analytics_workspace_id       = var.log_analytics_workspace_id
-  common_tags                      = var.common_tags
-  enable_diagnostics               = var.enable_diagnostics
+  unique_suffix                          = module.foundation.unique_suffix
+  resource_group_name                    = var.resource_group_name_resources
+  location                               = var.location
+  subnet_id_container_apps               = var.subnet_id_container_apps
+  container_image                        = var.container_image
+  service_connection_client_id           = var.service_connection_client_id
+  service_connection_client_secret       = var.service_connection_client_secret
+  tenant_id                              = var.tenant_id
+  ai_project_endpoint                    = module.ai_foundry.ai_foundry_endpoint
+  ai_foundry_agent_id                    = var.ai_foundry_agent_id
+  ai_model_deployment_name               = module.ai_foundry.ai_model_deployment_name
+  azure_client_id                        = module.identity.user_assigned_identity_client_id
+  registry_server                        = module.acr.acr_login_server
+  user_assigned_identity_id              = module.identity.user_assigned_identity_id
+  log_analytics_workspace_id             = var.log_analytics_workspace_id
+  application_insights_connection_string = var.application_insights_id != null ? data.azurerm_application_insights.existing[0].connection_string : null
+  common_tags                            = var.common_tags
+  enable_diagnostics                     = var.enable_diagnostics
 }
 
 

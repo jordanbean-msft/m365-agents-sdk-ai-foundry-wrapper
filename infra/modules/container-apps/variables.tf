@@ -88,3 +88,10 @@ variable "enable_diagnostics" {
   type        = bool
   default     = true
 }
+
+variable "application_insights_connection_string" {
+  description = "Application Insights connection string for Container Apps monitoring (optional)"
+  type        = string
+  default     = null
+  sensitive   = true
+}

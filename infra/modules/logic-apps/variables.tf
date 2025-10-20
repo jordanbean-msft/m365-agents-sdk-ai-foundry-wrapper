@@ -54,3 +54,10 @@ variable "website_dns_server" {
   description = "DNS server IP address for WEBSITE_DNS_SERVER app setting."
   type        = string
 }
+
+variable "application_insights_connection_string" {
+  description = "Application Insights connection string for Logic Apps monitoring (optional)"
+  type        = string
+  default     = null
+  sensitive   = true
+}

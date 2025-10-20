@@ -104,9 +104,9 @@ def build_workflow_definition(workflow_name: str) -> dict:
     template = load_workflow_template()
 
     # Customize the response body to include the workflow name
-    if "definition" in template and "actions" in template["definition"]:
-        if "Respond" in template["definition"]["actions"]:
-            template["definition"]["actions"]["Respond"]["inputs"]["body"]["workflow"] = workflow_name
+    # if "definition" in template and "actions" in template["definition"]:
+    #     if "Respond" in template["definition"]["actions"]:
+    #         template["definition"]["actions"]["Respond"]["inputs"]["body"]["workflow"] = workflow_name
 
     return template["definition"]
 
@@ -129,8 +129,7 @@ def build_zip_package(workflow_name: str) -> bytes:
     mem_file = io.BytesIO()
     with zipfile.ZipFile(mem_file, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("host.json", json.dumps(host_json, indent=2))
-        # Standard layout: workflows/<name>/workflow.json
-        zf.writestr(f"workflows/{workflow_name}/workflow.json",
+        zf.writestr(f"{workflow_name}/workflow.json",
                     json.dumps(workflow_content, indent=2))
     mem_file.seek(0)
     return mem_file.read()
@@ -188,7 +187,7 @@ def get_trigger_callback_url(subscription_id: str, resource_group: str, site_nam
     url = (
         f"{MGMT_BASE}/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/"
         f"Microsoft.Web/sites/{site_name}/hostruntime/runtime/webhooks/workflow/api/management/workflows/"
-        f"{workflow_name}/triggers/manual/listCallbackUrl?api-version={MGMT_API_VERSION_WORKFLOW}"
+        f"{workflow_name}/triggers/When_an_HTTP_request_is_received/listCallbackUrl?api-version={MGMT_API_VERSION_WORKFLOW}"
     )
     resp = requests.post(url, headers={"Authorization": f"Bearer {token}"})
     if resp.status_code >= 300:
