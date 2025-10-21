@@ -18,6 +18,10 @@ locals {
       id   = var.nsg_id_container_apps
       name = element(reverse(split("/", var.nsg_id_container_apps)), 0)
     }
+    app_gateway = {
+      id   = var.nsg_id_app_gateway
+      name = element(reverse(split("/", var.nsg_id_app_gateway)), 0)
+    }
   }
 }
 

@@ -49,6 +49,17 @@ This repository provisions a secure, modular Azure infrastructure for AI Foundry
   - NSGs (`nsgs` module) are attached per subnet: agent, private endpoints, logic-apps, container-apps. Default rules (deny inbound except VirtualNetwork) currently in effect; add explicit rules inside that module only.
   - No public IPs are assigned; public network access disabled on all services.
   - Tag consistency is enforced via `common_tags` variable rather than provider default tags (azapi resources require explicit tagging).
+- **Private Endpoints:**
+  - All private endpoint resources must include a lifecycle block that ignores changes to `private_dns_zone_group`.
+  - This prevents Terraform from attempting to manage DNS zone groups that may be created/managed externally or through Azure policies.
+  - Example:
+    ```hcl
+    lifecycle {
+      ignore_changes = [
+        private_dns_zone_group
+      ]
+    }
+    ```
 
 ## Integration Points
 

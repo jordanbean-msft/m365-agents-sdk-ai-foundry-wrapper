@@ -103,16 +103,17 @@ resource "azurerm_container_app" "main" {
     max_replicas = 10
   }
 
-  ## Secret configuration
+  ## Secret configuration - Reference Key Vault secret
   secret {
-    name  = "service-connection-client-secret"
-    value = var.service_connection_client_secret
+    name                = "service-connection-client-secret"
+    key_vault_secret_id = "${var.key_vault_uri}secrets/service-connection-client-secret"
+    identity            = var.user_assigned_identity_id
   }
 
-  ## Ingress configuration
+  ## Ingress configuration - Internal only, exposed via Application Gateway
   ingress {
     external_enabled = true
-    target_port      = 80
+    target_port      = 3978
     traffic_weight {
       latest_revision = true
       percentage      = 100
@@ -137,12 +138,25 @@ resource "azurerm_monitor_diagnostic_setting" "container_app_env" {
   enabled_metric { category = "AllMetrics" }
 }
 
-## Diagnostic Settings for Container App
-resource "azurerm_monitor_diagnostic_setting" "container_app" {
-  count                      = var.enable_diagnostics ? 1 : 0
-  name                       = "${azurerm_container_app.main.name}-diag"
-  target_resource_id         = azurerm_container_app.main.id
-  log_analytics_workspace_id = var.log_analytics_workspace_id
-  enabled_log { category_group = "allLogs" }
-  enabled_metric { category = "AllMetrics" }
+## Private Endpoint for Container App Environment
+resource "azurerm_private_endpoint" "container_app_env" {
+  name                = "pe-cae-${var.unique_suffix}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  subnet_id           = var.subnet_id_private_endpoint
+
+  private_service_connection {
+    name                           = "pe-connection-cae-${var.unique_suffix}"
+    private_connection_resource_id = azurerm_container_app_environment.main.id
+    is_manual_connection           = false
+    subresource_names              = ["managedEnvironments"]
+  }
+
+  lifecycle {
+    ignore_changes = [
+      private_dns_zone_group
+    ]
+  }
+
+  tags = var.common_tags
 }

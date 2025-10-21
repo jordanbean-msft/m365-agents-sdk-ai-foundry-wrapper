@@ -1,6 +1,21 @@
 output "pe_storage_id" {
-  description = "ID of the storage account private endpoint"
+  description = "ID of the storage account private endpoint (blob)"
   value       = azurerm_private_endpoint.pe_storage.id
+}
+
+output "pe_storage_file_id" {
+  description = "ID of the storage account private endpoint (file)"
+  value       = azurerm_private_endpoint.pe_storage_file.id
+}
+
+output "pe_storage_queue_id" {
+  description = "ID of the storage account private endpoint (queue)"
+  value       = azurerm_private_endpoint.pe_storage_queue.id
+}
+
+output "pe_storage_table_id" {
+  description = "ID of the storage account private endpoint (table)"
+  value       = azurerm_private_endpoint.pe_storage_table.id
 }
 
 output "pe_cosmosdb_id" {

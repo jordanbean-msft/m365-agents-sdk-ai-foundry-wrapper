@@ -64,6 +64,25 @@ At this point you should see the message
 
 The agent is ready to accept messages.
 
+## Health Check Endpoint
+
+The container exposes a lightweight unauthenticated liveness endpoint used by the Azure Application Gateway health probe:
+
+- Path: `/healthz` (alias `/health`)
+- Method: `GET`
+- Response: `200 OK` with JSON body: `{ "status": "ok", "service": "m365-agents", "time": "<UTC ISO8601>" }`
+- Purpose: Quickly indicate the process is running without invoking downstream services.
+
+If you test locally:
+
+```bash
+curl -i http://localhost:3978/healthz
+```
+
+You should see `HTTP/1.1 200 OK` and the JSON payload.
+
+> This endpoint bypasses JWT auth so the Application Gateway probe can succeed.
+
 ## Accessing the Agent
 
 ### Using the Agent in WebChat

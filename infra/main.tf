@@ -23,10 +23,12 @@ module "nsgs" {
   subnet_id_private_endpoint = var.subnet_id_private_endpoint
   subnet_id_logic_apps       = var.subnet_id_logic_apps
   subnet_id_container_apps   = var.subnet_id_container_apps
+  subnet_id_app_gateway      = var.subnet_id_app_gateway
   nsg_id_agent               = var.nsg_id_agent
   nsg_id_private_endpoints   = var.nsg_id_private_endpoints
   nsg_id_logic_apps          = var.nsg_id_logic_apps
   nsg_id_container_apps      = var.nsg_id_container_apps
+  nsg_id_app_gateway         = var.nsg_id_app_gateway
 }
 
 ## Storage module - Creates storage resources for agent data
@@ -175,6 +177,73 @@ module "identity" {
   common_tags         = var.common_tags
 }
 
+## Key Vault module - Secure storage for secrets
+##
+module "key_vault" {
+  source = "./modules/key-vault"
+
+  providers = {
+    azurerm = azurerm.workload_subscription
+  }
+
+  depends_on = [
+    module.identity
+  ]
+
+  unique_suffix              = module.foundation.unique_suffix
+  resource_group_name        = var.resource_group_name_resources
+  location                   = var.location
+  subnet_id_private_endpoint = var.subnet_id_private_endpoint
+  tenant_id                  = var.tenant_id
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+  common_tags                = var.common_tags
+  enable_diagnostics         = var.enable_diagnostics
+}
+
+## Store service connection client secret in Key Vault
+##
+resource "azurerm_key_vault_secret" "service_connection_client_secret" {
+  name         = "service-connection-client-secret"
+  value        = var.service_connection_client_secret
+  key_vault_id = module.key_vault.key_vault_id
+
+  provider = azurerm.workload_subscription
+
+  depends_on = [
+    azurerm_role_assignment.terraform_kv_admin
+  ]
+}
+
+## Grant Terraform service principal Key Vault Administrator role (for secret creation)
+## Note: Adjust principal_id to your Terraform execution identity
+##
+resource "azurerm_role_assignment" "terraform_kv_admin" {
+  scope                = module.key_vault.key_vault_id
+  role_definition_name = "Key Vault Administrator"
+  principal_id         = data.azurerm_client_config.current.object_id
+
+  provider = azurerm.workload_subscription
+
+  depends_on = [
+    module.key_vault
+  ]
+}
+
+## Grant managed identity Key Vault Secrets User role
+##
+resource "azurerm_role_assignment" "uami_kv_secrets_user" {
+  scope                = module.key_vault.key_vault_id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = module.identity.user_assigned_identity_principal_id
+
+  provider = azurerm.workload_subscription
+
+  depends_on = [
+    module.key_vault,
+    module.identity
+  ]
+}
+
 ## ACR module - Azure Container Registry for private images
 ##
 module "acr" {
@@ -208,16 +277,19 @@ module "container_apps" {
     module.ai_foundry,
     module.project,
     module.acr,
-    module.identity
+    module.identity,
+    module.key_vault,
+    azurerm_role_assignment.uami_kv_secrets_user
   ]
 
   unique_suffix                          = module.foundation.unique_suffix
   resource_group_name                    = var.resource_group_name_resources
   location                               = var.location
   subnet_id_container_apps               = var.subnet_id_container_apps
+  subnet_id_private_endpoint             = var.subnet_id_private_endpoint
   container_image                        = var.container_image
   service_connection_client_id           = var.service_connection_client_id
-  service_connection_client_secret       = var.service_connection_client_secret
+  key_vault_uri                          = module.key_vault.key_vault_uri
   tenant_id                              = var.tenant_id
   ai_project_endpoint                    = module.ai_foundry.ai_foundry_endpoint
   ai_foundry_agent_id                    = var.ai_foundry_agent_id
@@ -232,6 +304,39 @@ module "container_apps" {
 }
 
 
+## Bot Service module - Creates Azure Bot Service for M365 Agents Container App
+##
+module "bot_service" {
+  source = "./modules/bot-service"
+
+  providers = {
+    azurerm = azurerm.workload_subscription
+  }
+
+  depends_on = [
+    module.container_apps,
+    azurerm_key_vault_secret.service_connection_client_secret
+  ]
+
+  unique_suffix                            = module.foundation.unique_suffix
+  resource_group_name                      = var.resource_group_name_resources
+  location                                 = var.location
+  container_app_fqdn                       = module.container_apps.container_app_fqdn
+  microsoft_app_id                         = var.service_connection_client_id
+  microsoft_app_password                   = azurerm_key_vault_secret.service_connection_client_secret.value
+  tenant_id                                = var.tenant_id
+  sku                                      = var.bot_sku
+  enable_webchat                           = var.enable_bot_webchat
+  enable_teams                             = var.enable_bot_teams
+  enable_m365                              = var.enable_bot_m365
+  log_analytics_workspace_id               = var.log_analytics_workspace_id
+  application_insights_app_id              = var.application_insights_id != null ? data.azurerm_application_insights.existing[0].app_id : null
+  application_insights_instrumentation_key = var.application_insights_id != null ? data.azurerm_application_insights.existing[0].instrumentation_key : null
+  common_tags                              = var.common_tags
+  enable_diagnostics                       = var.enable_diagnostics
+}
+
+
 ## RBAC: Grant Cognitive Services User (Azure AI User) to the user-assigned identity on AI Foundry scope
 resource "azurerm_role_assignment" "uami_ai_foundry_user" {
   scope                = module.ai_foundry.ai_foundry_id
@@ -242,4 +347,27 @@ resource "azurerm_role_assignment" "uami_ai_foundry_user" {
     module.identity
   ]
   provider = azurerm.workload_subscription
+}
+
+## Application Gateway module - Provides public internet access to Container App
+##
+module "app_gateway" {
+  source = "./modules/app-gateway"
+
+  providers = {
+    azurerm = azurerm.workload_subscription
+  }
+
+  depends_on = [
+    module.container_apps
+  ]
+
+  unique_suffix              = module.foundation.unique_suffix
+  resource_group_name        = var.resource_group_name_resources
+  location                   = var.location
+  subnet_id_app_gateway      = var.subnet_id_app_gateway
+  container_app_fqdn         = module.container_apps.container_app_fqdn
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+  common_tags                = var.common_tags
+  enable_diagnostics         = var.enable_diagnostics
 }

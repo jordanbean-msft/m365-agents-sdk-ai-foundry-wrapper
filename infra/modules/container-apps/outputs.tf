@@ -28,3 +28,13 @@ output "container_app_fqdn" {
   value       = try(azurerm_container_app.main.ingress[0].fqdn, null)
 }
 
+output "private_endpoint_id" {
+  description = "ID of the Container App Environment private endpoint"
+  value       = azurerm_private_endpoint.container_app_env.id
+}
+
+output "private_endpoint_ip" {
+  description = "Private IP address of the Container App Environment private endpoint"
+  value       = try(azurerm_private_endpoint.container_app_env.private_service_connection[0].private_ip_address, null)
+}
+

@@ -33,3 +33,13 @@ output "acr_name" {
   description = "Name of the Azure Container Registry"
   value       = module.acr.acr_name
 }
+
+output "app_gateway_public_ip" {
+  description = "Public IP address of the Application Gateway for accessing the M365 Agents Container App"
+  value       = module.app_gateway.public_ip_address
+}
+
+output "app_gateway_name" {
+  description = "Name of the Application Gateway"
+  value       = module.app_gateway.application_gateway_name
+}

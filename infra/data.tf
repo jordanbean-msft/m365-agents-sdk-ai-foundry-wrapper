@@ -8,3 +8,10 @@ data "azurerm_application_insights" "existing" {
 
   provider = azurerm.workload_subscription
 }
+
+## Data source for current client configuration
+## Used to grant the Terraform execution identity access to Key Vault
+##
+data "azurerm_client_config" "current" {
+  provider = azurerm.workload_subscription
+}

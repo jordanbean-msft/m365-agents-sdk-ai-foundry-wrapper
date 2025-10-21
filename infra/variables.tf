@@ -23,6 +23,11 @@ variable "subnet_id_container_apps" {
   type        = string
 }
 
+variable "subnet_id_app_gateway" {
+  description = "The resource id of the subnet that will be used for Application Gateway deployment"
+  type        = string
+}
+
 variable "subscription_id_resources" {
   description = "The subscription id where the resources will be deployed"
   type        = string
@@ -106,8 +111,38 @@ variable "nsg_id_container_apps" {
   type        = string
 }
 
+variable "nsg_id_app_gateway" {
+  description = "Resource ID of existing Network Security Group for application gateway subnet"
+  type        = string
+}
+
 ## Optional Logic Apps settings
 variable "logic_apps_website_dns_server" {
   description = "DNS server IP address to set as WEBSITE_DNS_SERVER for the Logic App"
   type        = string
+}
+
+## Bot Service variables
+variable "bot_sku" {
+  description = "SKU for the Bot Service. Valid values: F0 (Free), S1 (Standard)"
+  type        = string
+  default     = "F0"
+}
+
+variable "enable_bot_webchat" {
+  description = "Enable Web Chat channel for testing through Azure Portal"
+  type        = bool
+  default     = true
+}
+
+variable "enable_bot_teams" {
+  description = "Enable Microsoft Teams channel for the bot"
+  type        = bool
+  default     = true
+}
+
+variable "enable_bot_m365" {
+  description = "Enable M365 channel for the bot"
+  type        = bool
+  default     = true
 }

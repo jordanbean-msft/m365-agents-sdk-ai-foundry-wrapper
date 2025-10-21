@@ -33,6 +33,11 @@ variable "subnet_id_container_apps" {
   type        = string
 }
 
+variable "subnet_id_app_gateway" {
+  description = "Existing subnet ID for Application Gateway"
+  type        = string
+}
+
 variable "common_tags" {
   description = "Common tags to apply to NSG resources"
   type        = map(string)
@@ -57,5 +62,10 @@ variable "nsg_id_logic_apps" {
 
 variable "nsg_id_container_apps" {
   description = "Resource ID of existing Network Security Group for container apps subnet"
+  type        = string
+}
+
+variable "nsg_id_app_gateway" {
+  description = "Resource ID of existing Network Security Group for application gateway subnet"
   type        = string
 }

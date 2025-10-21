@@ -1,7 +1,7 @@
 ########## Create Private Endpoints
 ##########
 
-## Create Private Endpoint for Storage Account
+## Create Private Endpoint for Storage Account (Blob)
 ##
 resource "azurerm_private_endpoint" "pe_storage" {
   depends_on = [
@@ -18,6 +18,90 @@ resource "azurerm_private_endpoint" "pe_storage" {
     private_connection_resource_id = var.storage_account_id
     subresource_names = [
       "blob"
+    ]
+    is_manual_connection = false
+  }
+
+  lifecycle {
+    ignore_changes = [
+      private_dns_zone_group
+    ]
+  }
+}
+
+## Create Private Endpoint for Storage Account (File)
+##
+resource "azurerm_private_endpoint" "pe_storage_file" {
+  depends_on = [
+    azurerm_private_endpoint.pe_storage
+  ]
+
+  name                = "${var.storage_account_name}-file-private-endpoint"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  subnet_id           = var.subnet_id_private_endpoint
+  tags                = var.common_tags
+  private_service_connection {
+    name                           = "${var.storage_account_name}-file-private-link-service-connection"
+    private_connection_resource_id = var.storage_account_id
+    subresource_names = [
+      "file"
+    ]
+    is_manual_connection = false
+  }
+
+  lifecycle {
+    ignore_changes = [
+      private_dns_zone_group
+    ]
+  }
+}
+
+## Create Private Endpoint for Storage Account (Queue)
+##
+resource "azurerm_private_endpoint" "pe_storage_queue" {
+  depends_on = [
+    azurerm_private_endpoint.pe_storage_file
+  ]
+
+  name                = "${var.storage_account_name}-queue-private-endpoint"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  subnet_id           = var.subnet_id_private_endpoint
+  tags                = var.common_tags
+  private_service_connection {
+    name                           = "${var.storage_account_name}-queue-private-link-service-connection"
+    private_connection_resource_id = var.storage_account_id
+    subresource_names = [
+      "queue"
+    ]
+    is_manual_connection = false
+  }
+
+  lifecycle {
+    ignore_changes = [
+      private_dns_zone_group
+    ]
+  }
+}
+
+## Create Private Endpoint for Storage Account (Table)
+##
+resource "azurerm_private_endpoint" "pe_storage_table" {
+  depends_on = [
+    azurerm_private_endpoint.pe_storage_queue
+  ]
+
+  name                = "${var.storage_account_name}-table-private-endpoint"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  subnet_id           = var.subnet_id_private_endpoint
+  tags                = var.common_tags
+  private_service_connection {
+    name                           = "${var.storage_account_name}-table-private-link-service-connection"
+    private_connection_resource_id = var.storage_account_id
+    subresource_names = [
+      "table"
     ]
     is_manual_connection = false
   }

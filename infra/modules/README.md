@@ -139,6 +139,124 @@ Creates Logic Apps Standard with full network isolation:
 
 ---
 
+### 7. Identity Module (`identity/`)
+
+Creates user-assigned managed identities for compute resources:
+
+- User-assigned managed identity for Container Apps
+
+**Inputs:**
+
+- `unique_suffix` - From foundation module
+- `resource_group_name` - Target resource group
+- `location` - Azure region
+
+**Outputs:**
+
+- User-assigned identity details (ID, principal ID, client ID)
+
+---
+
+### 8. ACR Module (`acr/`)
+
+Creates Azure Container Registry with private endpoint:
+
+- Azure Container Registry (Premium SKU)
+- Private endpoint for secure access
+- AcrPull role assignment to user-assigned identity
+
+**Inputs:**
+
+- `unique_suffix` - From foundation module
+- `resource_group_name` - Target resource group
+- `location` - Azure region
+- `subnet_id_private_endpoint` - Subnet for private endpoint
+- `pull_principal_id` - Principal ID to grant AcrPull role
+
+**Outputs:**
+
+- ACR details (ID, name, login server)
+
+---
+
+### 9. Container Apps Module (`container-apps/`)
+
+Creates Container App Environment and Container App with VNet integration:
+
+- Container App Environment with workload profiles
+- Container App with managed identity and AI Foundry integration
+- VNet integration for secure networking
+- Private registry authentication
+
+**Inputs:**
+
+- `unique_suffix` - From foundation module
+- `resource_group_name` - Target resource group
+- `location` - Azure region
+- `subnet_id_container_apps` - Subnet for Container Apps
+- `container_image` - Container image to deploy
+- Service connection credentials
+- AI Foundry configuration
+- `user_assigned_identity_id` - User-assigned identity for ACR pull
+
+**Outputs:**
+
+- Container App Environment details (ID, name)
+- Container App details (ID, name, FQDN, principal ID)
+
+---
+
+### 10. Bot Service Module (`bot-service/`)
+
+Creates Azure Bot Service for exposing the M365 Agents Container App:
+
+- Bot Channel Registration with Microsoft Entra ID authentication
+- Microsoft Teams channel integration
+- Optional Web Chat channel for testing
+- Diagnostic settings for monitoring
+
+**Inputs:**
+
+- `unique_suffix` - From foundation module
+- `resource_group_name` - Target resource group
+- `location` - Azure region
+- `container_app_fqdn` - FQDN from Container Apps module
+- `microsoft_app_id` - Microsoft App ID from Entra ID app registration
+- `sku` - Bot Service SKU (F0 or S1)
+- `enable_calling` - Enable Teams calling features
+- `enable_webchat` - Enable Web Chat channel
+
+**Outputs:**
+
+- Bot Service details (ID, name, endpoint, Microsoft App ID)
+
+**Prerequisites:**
+
+- Microsoft Entra ID app registration required before deployment
+- Container App must have external ingress enabled
+- Container App must implement bot framework middleware
+
+---
+
+### 11. NSGs Module (`nsgs/`)
+
+Attaches existing Network Security Groups to subnets:
+
+- Associates pre-existing NSGs with subnets
+- Supports agent, private endpoints, logic-apps, and container-apps subnets
+- No NSG creation (references existing by resource ID)
+
+**Inputs:**
+
+- Existing subnet IDs
+- Existing NSG resource IDs
+
+**Outputs:**
+
+- NSG association IDs
+
+---
+
 ## Module Dependencies
 
 ```
@@ -147,8 +265,12 @@ foundation
     │       └── networking
     ├── ai-foundry ┘
     │           └── project
-  ├── logic_apps
-  └── nsgs (independent - secures existing subnets)
+    ├── identity
+    │       └── acr
+    │           └── container-apps
+    │                   └── bot-service
+    ├── logic_apps
+    └── nsgs (independent - secures existing subnets)
 ```
 
 ## Usage

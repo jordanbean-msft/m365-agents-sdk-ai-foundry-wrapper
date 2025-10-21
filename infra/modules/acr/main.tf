@@ -13,6 +13,19 @@ resource "azurerm_container_registry" "main" {
   tags                          = var.common_tags
 }
 
+resource "azapi_update_resource" "acr_network_bypass" {
+  type        = "Microsoft.ContainerRegistry/registries@2025-05-01-preview"
+  resource_id = azurerm_container_registry.main.id
+
+  body = {
+    properties = {
+      networkRuleBypassAllowedForTasks = true
+    }
+  }
+
+  depends_on = [azurerm_container_registry.main]
+}
+
 resource "azurerm_role_assignment" "acr_pull" {
   scope                = azurerm_container_registry.main.id
   role_definition_name = "AcrPull"

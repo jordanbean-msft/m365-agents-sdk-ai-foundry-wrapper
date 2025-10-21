@@ -18,6 +18,11 @@ variable "subnet_id_container_apps" {
   type        = string
 }
 
+variable "subnet_id_private_endpoint" {
+  description = "Subnet ID for private endpoints"
+  type        = string
+}
+
 variable "container_image" {
   description = "Container image to deploy (e.g., mcr.microsoft.com/azuredocs/containerapps-helloworld:latest)"
   type        = string
@@ -29,10 +34,9 @@ variable "service_connection_client_id" {
   type        = string
 }
 
-variable "service_connection_client_secret" {
-  description = "Client secret for service connection"
+variable "key_vault_uri" {
+  description = "Key Vault URI for secret references"
   type        = string
-  sensitive   = true
 }
 
 variable "tenant_id" {
