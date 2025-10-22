@@ -39,3 +39,19 @@ variable "enable_diagnostics" {
   type        = bool
   default     = true
 }
+
+variable "key_vault_certificate_secret_id" {
+  description = "Key Vault secret ID for the Application Gateway SSL certificate (e.g., https://kv-xxx.vault.azure.net/secrets/appgw-cert/xxx)."
+  type        = string
+  sensitive   = true
+}
+
+variable "user_assigned_identity_id" {
+  description = "Resource ID of the user-assigned managed identity for Application Gateway"
+  type        = string
+}
+
+variable "user_assigned_identity_principal_id" {
+  description = "Principal ID of the user-assigned managed identity for Application Gateway"
+  type        = string
+}

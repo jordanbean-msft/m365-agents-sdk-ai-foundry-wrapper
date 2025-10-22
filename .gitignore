@@ -362,3 +362,9 @@ terraform.tfstate.**.backup
 tfplan
 
 terraform.tfvars
+
+*.pfx
+
+*.pem
+
+.appPackage/

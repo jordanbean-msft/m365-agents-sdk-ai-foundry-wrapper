@@ -2,6 +2,7 @@
 # Licensed under the MIT License.
 
 import logging
+import os
 
 # Import agent handlers so decorator side-effects register routes.
 from . import agent  # noqa: F401
@@ -10,9 +11,31 @@ from .config import AGENT_APP, CONNECTION_MANAGER
 # for more information, see README.md for Quickstart Agent
 from .start_server import start_server
 
-ms_agents_logger = logging.getLogger("microsoft_agents")
-ms_agents_logger.addHandler(logging.StreamHandler())
-ms_agents_logger.setLevel(logging.INFO)
+
+def _configure_root_logging() -> None:
+    """Configure root logging once with level, format, and stdout handler.
+
+    LOG_LEVEL can be overridden via environment variable. Defaults to INFO.
+    """
+    root_logger = logging.getLogger()
+    if root_logger.handlers:  # already configured (hosting env)
+        return
+
+    log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+    level = getattr(logging, log_level_name, logging.INFO)
+
+    logging.basicConfig(
+        level=level,
+        format=(
+            "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+        ),
+    )
+
+    # Ensure microsoft_agents logger inherits level (override possible later)
+    logging.getLogger("microsoft_agents").setLevel(level)
+
+
+_configure_root_logging()
 
 
 def main():

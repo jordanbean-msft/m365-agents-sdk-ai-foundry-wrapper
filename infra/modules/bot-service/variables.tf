@@ -13,8 +13,8 @@ variable "location" {
   type        = string
 }
 
-variable "container_app_fqdn" {
-  description = "FQDN of the Container App that hosts the bot logic"
+variable "bot_messaging_endpoint" {
+  description = "Messaging endpoint URL for the bot (e.g., https://example.com/api/messages)"
   type        = string
 }
 

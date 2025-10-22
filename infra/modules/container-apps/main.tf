@@ -90,6 +90,17 @@ resource "azurerm_container_app" "main" {
         value = var.azure_client_id
       }
 
+      ## Logging & runtime controls
+      env {
+        name  = "LOG_LEVEL"
+        value = var.log_level
+      }
+
+      env {
+        name  = "PYTHONUNBUFFERED"
+        value = "1"
+      }
+
       dynamic "env" {
         for_each = var.application_insights_connection_string != null ? [1] : []
         content {
@@ -127,6 +138,18 @@ resource "azurerm_container_app" "main" {
   }
   tags = var.common_tags
 }
+
+## Diagnostic Settings for Container App (console & system logs)
+# resource "azurerm_monitor_diagnostic_setting" "container_app_logs" {
+#   count                      = var.enable_diagnostics ? 1 : 0
+#   name                       = "${azurerm_container_app.main.name}-logs"
+#   target_resource_id         = azurerm_container_app.main.id
+#   log_analytics_workspace_id = var.log_analytics_workspace_id
+
+#   enabled_log { category = "ContainerAppConsoleLogs" }
+#   enabled_log { category = "ContainerAppSystemLogs" }
+#   enabled_metric { category = "AllMetrics" }
+# }
 
 ## Diagnostic Settings for Container App Environment
 resource "azurerm_monitor_diagnostic_setting" "container_app_env" {

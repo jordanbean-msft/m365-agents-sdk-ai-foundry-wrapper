@@ -29,6 +29,19 @@ logger = logging.getLogger(__name__)
 
 @AGENT_APP.conversation_update("membersAdded")
 async def on_members_added(context: TurnContext, state: TurnState):  # noqa: ARG001
+    conversation_id = context.activity.conversation.id
+    user_id = (
+        context.activity.from_property.id
+        if context.activity.from_property
+        else "unknown"
+    )
+    logger.info(
+        "New connection established - Conversation ID: %s, "
+        "User ID: %s, Activity ID: %s",
+        conversation_id,
+        user_id,
+        context.activity.id
+    )
     await context.send_activity(
         "Welcome to the Azure AI Foundry streaming sample. Ask any question "
         "and I'll stream the answer!"
@@ -44,7 +57,12 @@ async def invoke(context: TurnContext, state: TurnState):  # noqa: ARG001
         type=ActivityTypes.invoke_response,
         value={"status": 200}
     )
-    print(f"Invoke activity received: {context.activity}")
+    logger.info(
+        "Invoke activity received - ConvID=%s Type=%s ActID=%s",
+        getattr(context.activity.conversation, "id", "unknown"),
+        context.activity.type,
+        context.activity.id,
+    )
     await context.send_activity(invoke_response)
 
 
@@ -82,7 +100,30 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
 
     try:
         conversation_id = context.activity.conversation.id
-        user_content = context.activity.text.strip() if context.activity.text else ""
+        user_id = (
+            context.activity.from_property.id
+            if context.activity.from_property
+            else "unknown"
+        )
+        activity_id = context.activity.id
+        user_content = (
+            context.activity.text.strip()
+            if context.activity.text
+            else ""
+        )
+
+        logger.info(
+            "Message received - Conversation ID: %s, User ID: %s, "
+            "Activity ID: %s, Message: '%s'",
+            conversation_id,
+            user_id,
+            activity_id,
+            (
+                user_content[:100] + "..."
+                if len(user_content) > 100
+                else user_content
+            )
+        )
         if not user_content:
             context.streaming_response.queue_text_chunk(
                 "Please enter a question to receive a streamed answer."
@@ -101,35 +142,83 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
             if tool_resources is not None:
                 conversation_tool_resources[conversation_id] = tool_resources
             conversation_agents[conversation_id] = agent
-            logger.info("Created new ChatAgent for conversation %s", conversation_id)
+            logger.info(
+                "Created new ChatAgent for conversation %s",
+                conversation_id
+            )
         else:
-            logger.info("Reusing ChatAgent for conversation %s", conversation_id)
+            logger.info(
+                "Reusing ChatAgent for conversation %s",
+                conversation_id
+            )
 
         if not thread:
             # Create a new AgentThread for this conversation
             thread = agent.get_new_thread()
             conversation_threads[conversation_id] = thread
+            thread_id = getattr(thread, 'id', 'unknown')
             logger.info(
-                "Created new AgentThread for conversation %s", conversation_id
+                "Created new AgentThread - Conversation ID: %s, Thread ID: %s",
+                conversation_id,
+                thread_id
             )
         else:
+            thread_id = getattr(thread, 'id', 'unknown')
             logger.info(
-                "Reusing AgentThread for conversation %s", conversation_id
+                "Reusing AgentThread - Conversation ID: %s, Thread ID: %s",
+                conversation_id,
+                thread_id
             )
 
         run_kwargs = {}
         tool_res = conversation_tool_resources.get(conversation_id)
         if tool_res is not None:
             run_kwargs["tool_resources"] = tool_res
+
+        logger.info(
+            "Starting agent run_stream - Conversation ID: %s, "
+            "Thread ID: %s, Agent ID: %s",
+            conversation_id,
+            thread_id,
+            AZURE_AI_FOUNDRY_AGENT_ID
+        )
+
+        chunk_count = 0
+        run_id = None
         async for chunk in agent.run_stream(
             user_content, thread=thread, **run_kwargs
         ):
+            # Try to extract run_id from the chunk if available
+            if run_id is None and hasattr(chunk, 'run_id'):
+                run_id = chunk.run_id
+                logger.info(
+                    "Agent run started - Conversation ID: %s, "
+                    "Thread ID: %s, Run ID: %s",
+                    conversation_id,
+                    thread_id,
+                    run_id
+                )
+
             if chunk.text:
+                chunk_count += 1
                 context.streaming_response.queue_text_chunk(chunk.text)  # noqa: attr-defined
+
+        logger.info(
+            "Agent run completed - Conversation ID: %s, "
+            "Thread ID: %s, Run ID: %s, Chunks: %d",
+            conversation_id,
+            thread_id,
+            run_id or 'unknown',
+            chunk_count
+        )
 
     except Exception as exc:  # noqa: BLE001 - broad catch to surface to user
         logger.error(
-            "Error during Agent Framework streaming: %s", exc
+            "Error during Agent Framework streaming - "
+            "Conversation ID: %s, Error: %s",
+            context.activity.conversation.id,
+            exc,
+            exc_info=True
         )
         context.streaming_response.queue_text_chunk(
             "An error occurred while generating the answer. "

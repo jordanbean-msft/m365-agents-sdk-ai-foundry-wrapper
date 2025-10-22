@@ -291,7 +291,7 @@ module "container_apps" {
   service_connection_client_id           = var.service_connection_client_id
   key_vault_uri                          = module.key_vault.key_vault_uri
   tenant_id                              = var.tenant_id
-  ai_project_endpoint                    = module.ai_foundry.ai_foundry_endpoint
+  ai_project_endpoint                    = module.project.ai_foundry_project_endpoint
   ai_foundry_agent_id                    = var.ai_foundry_agent_id
   ai_model_deployment_name               = module.ai_foundry.ai_model_deployment_name
   azure_client_id                        = module.identity.user_assigned_identity_client_id
@@ -301,6 +301,7 @@ module "container_apps" {
   application_insights_connection_string = var.application_insights_id != null ? data.azurerm_application_insights.existing[0].connection_string : null
   common_tags                            = var.common_tags
   enable_diagnostics                     = var.enable_diagnostics
+  log_level                              = var.log_level
 }
 
 
@@ -321,7 +322,7 @@ module "bot_service" {
   unique_suffix                            = module.foundation.unique_suffix
   resource_group_name                      = var.resource_group_name_resources
   location                                 = var.location
-  container_app_fqdn                       = module.container_apps.container_app_fqdn
+  bot_messaging_endpoint                   = var.bot_messaging_endpoint
   microsoft_app_id                         = var.service_connection_client_id
   microsoft_app_password                   = azurerm_key_vault_secret.service_connection_client_secret.value
   tenant_id                                = var.tenant_id
@@ -349,6 +350,24 @@ resource "azurerm_role_assignment" "uami_ai_foundry_user" {
   provider = azurerm.workload_subscription
 }
 
+## Upload PFX certificate to Key Vault
+##
+resource "azurerm_key_vault_certificate" "appgw_cert" {
+  name         = var.appgw_certificate_name
+  key_vault_id = module.key_vault.key_vault_id
+
+  certificate {
+    contents = filebase64(var.pfx_certificate_path)
+    password = var.pfx_certificate_password
+  }
+
+  provider = azurerm.workload_subscription
+
+  depends_on = [
+    azurerm_role_assignment.terraform_kv_admin
+  ]
+}
+
 ## Application Gateway module - Provides public internet access to Container App
 ##
 module "app_gateway" {
@@ -359,15 +378,20 @@ module "app_gateway" {
   }
 
   depends_on = [
-    module.container_apps
+    module.container_apps,
+    module.identity,
+    azurerm_role_assignment.uami_kv_secrets_user
   ]
 
-  unique_suffix              = module.foundation.unique_suffix
-  resource_group_name        = var.resource_group_name_resources
-  location                   = var.location
-  subnet_id_app_gateway      = var.subnet_id_app_gateway
-  container_app_fqdn         = module.container_apps.container_app_fqdn
-  log_analytics_workspace_id = var.log_analytics_workspace_id
-  common_tags                = var.common_tags
-  enable_diagnostics         = var.enable_diagnostics
+  unique_suffix                       = module.foundation.unique_suffix
+  resource_group_name                 = var.resource_group_name_resources
+  location                            = var.location
+  subnet_id_app_gateway               = var.subnet_id_app_gateway
+  container_app_fqdn                  = module.container_apps.container_app_fqdn
+  log_analytics_workspace_id          = var.log_analytics_workspace_id
+  common_tags                         = var.common_tags
+  enable_diagnostics                  = var.enable_diagnostics
+  key_vault_certificate_secret_id     = azurerm_key_vault_certificate.appgw_cert.secret_id
+  user_assigned_identity_id           = module.identity.user_assigned_identity_id
+  user_assigned_identity_principal_id = module.identity.user_assigned_identity_principal_id
 }

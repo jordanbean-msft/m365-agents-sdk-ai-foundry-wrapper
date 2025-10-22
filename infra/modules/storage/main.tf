@@ -110,8 +110,12 @@ resource "azurerm_monitor_diagnostic_setting" "storage_account" {
   name                       = "${azurerm_storage_account.storage_account.name}-diag"
   target_resource_id         = azurerm_storage_account.storage_account.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
-  # Removed unsupported log categories; keeping metrics only until correct categories confirmed.
-  enabled_metric { category = "AllMetrics" }
+  enabled_metric {
+    category = "Capacity"
+  }
+  enabled_metric {
+    category = "Transaction"
+  }
 }
 
 resource "azurerm_monitor_diagnostic_setting" "cosmosdb" {
@@ -120,7 +124,12 @@ resource "azurerm_monitor_diagnostic_setting" "cosmosdb" {
   target_resource_id         = azurerm_cosmosdb_account.cosmosdb.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
   enabled_log { category_group = "allLogs" }
-  enabled_metric { category = "AllMetrics" }
+  enabled_metric {
+    category = "Requests"
+  }
+  enabled_metric {
+    category = "SLI"
+  }
 }
 
 resource "azurerm_monitor_diagnostic_setting" "ai_search" {

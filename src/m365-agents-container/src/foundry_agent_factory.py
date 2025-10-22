@@ -50,7 +50,7 @@ async def create_chat_agent_from_foundry(
         )
     except Exception as ex:  # noqa: BLE001
         logger.warning(
-            "Failed to fetch Foundry agent '%s': %s. Creating minimal ChatAgent.",
+            "Failed fetch Foundry agent '%s': %s. Using minimal ChatAgent.",
             agent_id,
             ex,
         )
@@ -77,6 +77,31 @@ async def create_chat_agent_from_foundry(
         except Exception as tool_ex:  # noqa: BLE001
             logger.warning("Error parsing Foundry tools: %s", tool_ex)
 
+        # Deduplicate OpenAPI tool names to avoid Azure API errors.
+        # Passing both persisted agent tools and an identical set in the run
+        # payload can trigger the "OpenAPI tools must have unique names" error.
+        deduped_tools: list[Any] = []
+        seen_openapi_names: set[str] = set()
+        for t in foundry_tools:
+            t_type = getattr(t, "type", None)
+            if t_type == "openapi":
+                name = (
+                    getattr(getattr(t, "openapi", None), "name", None)
+                    or getattr(t, "name", None)
+                )
+                if name:
+                    if name in seen_openapi_names:
+                        logger.warning(
+                            "Skipping duplicate OpenAPI tool '%s'", name
+                        )
+                        continue
+                    seen_openapi_names.add(name)
+            deduped_tools.append(t)
+        if deduped_tools:
+            logger.info(
+                "Found %d tools; omitting to avoid duplicate registration",
+                len(deduped_tools),
+            )
         chat_agent_kwargs.update(
             {
                 "name": getattr(fetched_agent, "name", None) or None,
@@ -89,7 +114,6 @@ async def create_chat_agent_from_foundry(
                 )
                 or None,
                 "model_id": getattr(fetched_agent, "model", None) or None,
-                "tools": foundry_tools if foundry_tools else None,
             }
         )
 
@@ -102,7 +126,7 @@ async def create_chat_agent_from_foundry(
 
         tool_resources = getattr(fetched_agent, "tool_resources", None)
         logger.info(
-            "Instantiated ChatAgent from Foundry '%s' (model=%s, temp=%s, top_p=%s, tools=%d)",
+            "ChatAgent from Foundry '%s' (model=%s temp=%s top_p=%s tools=%d)",
             getattr(fetched_agent, "name", agent_id),
             getattr(fetched_agent, "model", None),
             temperature,

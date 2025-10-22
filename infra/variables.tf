@@ -123,6 +123,11 @@ variable "logic_apps_website_dns_server" {
 }
 
 ## Bot Service variables
+variable "bot_messaging_endpoint" {
+  description = "Messaging endpoint URL for the bot (e.g., https://example.com/api/messages)"
+  type        = string
+}
+
 variable "bot_sku" {
   description = "SKU for the Bot Service. Valid values: F0 (Free), S1 (Standard)"
   type        = string
@@ -145,4 +150,29 @@ variable "enable_bot_m365" {
   description = "Enable M365 channel for the bot"
   type        = bool
   default     = true
+}
+
+## Application Gateway certificate variables
+variable "pfx_certificate_path" {
+  description = "Filesystem path to PFX certificate for uploading to Key Vault. Required to enable HTTPS on Application Gateway."
+  type        = string
+}
+
+variable "pfx_certificate_password" {
+  description = "Password for the PFX certificate at pfx_certificate_path."
+  type        = string
+  sensitive   = true
+}
+
+variable "appgw_certificate_name" {
+  description = "Name for the Application Gateway certificate in Key Vault"
+  type        = string
+  default     = "appgw-cert"
+}
+
+## Logging configuration
+variable "log_level" {
+  description = "Global log level passed to runtime components (e.g. INFO, DEBUG, WARNING)."
+  type        = string
+  default     = "INFO"
 }

@@ -99,3 +99,9 @@ variable "application_insights_connection_string" {
   default     = null
   sensitive   = true
 }
+
+variable "log_level" {
+  description = "Application log level exposed to the container via LOG_LEVEL environment variable (e.g., DEBUG, INFO, WARNING, ERROR)."
+  type        = string
+  default     = "INFO"
+}

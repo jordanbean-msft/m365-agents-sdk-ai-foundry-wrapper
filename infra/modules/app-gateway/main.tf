@@ -21,9 +21,21 @@ resource "azurerm_application_gateway" "main" {
   tags                = var.common_tags
 
   sku {
-    name     = "Standard_v2"
-    tier     = "Standard_v2"
+    name     = "WAF_v2"
+    tier     = "WAF_v2"
     capacity = 2
+  }
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [var.user_assigned_identity_id]
+  }
+
+  waf_configuration {
+    enabled          = true
+    firewall_mode    = "Detection"
+    rule_set_type    = "OWASP"
+    rule_set_version = "3.2"
   }
 
   gateway_ip_configuration {
@@ -68,6 +80,19 @@ resource "azurerm_application_gateway" "main" {
     protocol                       = "Http"
   }
 
+  ssl_certificate {
+    name                = "kv-cert"
+    key_vault_secret_id = var.key_vault_certificate_secret_id
+  }
+
+  http_listener {
+    name                           = "https-listener"
+    frontend_ip_configuration_name = "public-frontend"
+    frontend_port_name             = "https-port"
+    protocol                       = "Https"
+    ssl_certificate_name           = "kv-cert"
+  }
+
   request_routing_rule {
     name                       = "routing-rule"
     rule_type                  = "Basic"
@@ -75,6 +100,15 @@ resource "azurerm_application_gateway" "main" {
     backend_address_pool_name  = "container-app-backend"
     backend_http_settings_name = "http-settings"
     priority                   = 100
+  }
+
+  request_routing_rule {
+    name                       = "routing-rule-https"
+    rule_type                  = "Basic"
+    http_listener_name         = "https-listener"
+    backend_address_pool_name  = "container-app-backend"
+    backend_http_settings_name = "http-settings"
+    priority                   = 110
   }
 
   probe {

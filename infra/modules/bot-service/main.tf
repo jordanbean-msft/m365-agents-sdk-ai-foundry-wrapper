@@ -13,8 +13,8 @@ resource "azurerm_bot_service_azure_bot" "main" {
   microsoft_app_type      = "SingleTenant"
   microsoft_app_tenant_id = var.tenant_id
 
-  ## Messaging endpoint points to the Container App FQDN
-  endpoint = "https://${var.container_app_fqdn}/api/messages"
+  ## Messaging endpoint from configuration
+  endpoint = var.bot_messaging_endpoint
 
   ## Streaming messaging endpoint
   streaming_endpoint_enabled = true
