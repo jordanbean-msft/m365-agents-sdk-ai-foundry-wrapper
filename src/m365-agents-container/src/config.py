@@ -8,21 +8,17 @@ from __future__ import annotations
 
 import logging
 from os import environ
+from typing import List
 
 from azure.identity import DefaultAzureCredential
-from azure.identity.aio import (
-    DefaultAzureCredential as AsyncDefaultAzureCredential,
-)
+from azure.identity.aio import \
+    DefaultAzureCredential as AsyncDefaultAzureCredential
 from dotenv import load_dotenv
 from microsoft_agents.activity import load_configuration_from_env
 from microsoft_agents.authentication.msal import MsalConnectionManager
 from microsoft_agents.hosting.aiohttp import CloudAdapter
-from microsoft_agents.hosting.core import (
-    AgentApplication,
-    Authorization,
-    MemoryStorage,
-    TurnState,
-)
+from microsoft_agents.hosting.core import (AgentApplication, Authorization,
+                                           MemoryStorage, TurnState)
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +31,27 @@ AZURE_AI_FOUNDRY_AGENT_ID: str = environ.get("AZURE_AI_FOUNDRY_AGENT_ID", "")
 AZURE_AI_MODEL_DEPLOYMENT_NAME: str = environ.get(
     "AZURE_AI_MODEL_DEPLOYMENT_NAME", ""
 )
+
+# Conversation management settings
+# CONVERSATION_TIMEOUT_SECONDS: if > 0, a conversation that has had no user
+# activity for this many seconds will be reset on the next incoming message
+# (before processing) and the user will receive an Adaptive Card indicating
+# the timeout. 0 (default) disables timeouts.
+try:
+    CONVERSATION_TIMEOUT_SECONDS: int = int(
+        environ.get("CONVERSATION_TIMEOUT_SECONDS", "0")
+    )
+except ValueError:  # fallback if misconfigured
+    CONVERSATION_TIMEOUT_SECONDS = 0
+
+# Comma-separated list of keywords that trigger a manual reset when sent as
+# the *entire* message content (case-insensitive). Example: "reset,restart,new"
+RAW_RESET_KEYWORDS = environ.get(
+    "RESET_COMMAND_KEYWORDS", "reset,restart,new"
+)
+RESET_COMMAND_KEYWORDS: List[str] = [
+    k.strip().lower() for k in RAW_RESET_KEYWORDS.split(",") if k.strip()
+]
 
 # Core hosting components
 STORAGE = MemoryStorage()
@@ -58,6 +75,8 @@ __all__ = [
     "AZURE_AI_PROJECT_ENDPOINT",
     "AZURE_AI_FOUNDRY_AGENT_ID",
     "AZURE_AI_MODEL_DEPLOYMENT_NAME",
+    "CONVERSATION_TIMEOUT_SECONDS",
+    "RESET_COMMAND_KEYWORDS",
     "CONNECTION_MANAGER",
     "async_credential",
 ]

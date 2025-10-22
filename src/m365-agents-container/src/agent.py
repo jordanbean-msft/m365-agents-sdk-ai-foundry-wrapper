@@ -12,23 +12,28 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime, timezone
 
-from agent_framework import ChatAgent
-from agent_framework._threads import AgentThread  # type: ignore
-from microsoft_agents.activity import (Activity, ActivityTypes,
-                                       SensitivityUsageInfo)
+from microsoft_agents.activity import Activity, ActivityTypes, Attachment
 from microsoft_agents.hosting.core import TurnContext, TurnState
 
 from .config import (AGENT_APP, AZURE_AI_FOUNDRY_AGENT_ID,
-                     AZURE_AI_PROJECT_ENDPOINT, CONNECTION_MANAGER,
-                     async_credential)
+                     AZURE_AI_PROJECT_ENDPOINT, CONVERSATION_TIMEOUT_SECONDS,
+                     RESET_COMMAND_KEYWORDS, async_credential)
+from .conversation_state import (conversation_agents,
+                                 conversation_last_activity,
+                                 conversation_threads,
+                                 conversation_tool_resources,
+                                 reset_conversation)
 from .foundry_agent_factory import create_chat_agent_from_foundry
 
 logger = logging.getLogger(__name__)
 
 
 @AGENT_APP.conversation_update("membersAdded")
-async def on_members_added(context: TurnContext, state: TurnState):  # noqa: ARG001
+async def on_members_added(
+    context: TurnContext, state: TurnState
+):  # noqa: ARG001
     conversation_id = context.activity.conversation.id
     user_id = (
         context.activity.from_property.id
@@ -66,36 +71,97 @@ async def invoke(context: TurnContext, state: TurnState):  # noqa: ARG001
     await context.send_activity(invoke_response)
 
 
-# In-memory storage for ChatAgent and AgentThread per conversation_id
-# In production, use proper persistent storage
+def _build_reset_adaptive_card(title: str, message: str) -> dict:
+    """Return a minimal Adaptive Card payload with a Restart button.
 
-conversation_agents: dict[str, ChatAgent] = {}
-conversation_threads: dict[str, AgentThread] = {}
-# Store tool resources per conversation so we can pass them on each run
-conversation_tool_resources: dict[str, object] = {}
+    The Restart button sends a message containing the first configured reset
+    keyword (or 'reset' as a fallback) so command handling stays uniform.
+    """
+    reset_keyword = (
+        RESET_COMMAND_KEYWORDS[0] if RESET_COMMAND_KEYWORDS else "reset"
+    )
+    return {
+        "type": "message",
+        "attachments": [
+            {
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "content": {
+                    "$schema": (
+                        "http://adaptivecards.io/schemas/adaptive-card.json"
+                    ),
+                    "type": "AdaptiveCard",
+                    "version": "1.5",
+                    "body": [
+                        {
+                            "type": "TextBlock",
+                            "size": "Medium",
+                            "weight": "Bolder",
+                            "text": title,
+                        },
+                        {
+                            "type": "TextBlock",
+                            "wrap": True,
+                            "text": message,
+                        },
+                    ],
+                    "actions": [
+                        {
+                            "type": "Action.Submit",
+                            "title": "Restart Conversation",
+                            "data": {
+                                "msteams": {
+                                    "type": "messageBack",
+                                    "text": reset_keyword,
+                                    "displayText": "Restart",
+                                }
+                            },
+                        }
+                    ],
+                },
+            }
+        ],
+    }
+
+
+def _build_response_adaptive_card(markdown_text: str) -> dict:
+    """Return an Adaptive Card payload with markdown response content.
+
+    Renders the agent's response as a formatted markdown TextBlock.
+    """
+    return {
+        "type": "message",
+        "attachments": [
+            {
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "content": {
+                    "$schema": (
+                        "http://adaptivecards.io/schemas/adaptive-card.json"
+                    ),
+                    "type": "AdaptiveCard",
+                    "version": "1.5",
+                    "body": [
+                        {
+                            "type": "TextBlock",
+                            "text": markdown_text,
+                            "wrap": True,
+                        },
+                    ],
+                },
+            }
+        ],
+    }
 
 
 @AGENT_APP.message(re.compile(r".+"))
-async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG001
-
-    # The following attributes are provided dynamically by the SDK.
-    context.streaming_response.set_feedback_loop(True)  # noqa: attr-defined
-    context.streaming_response.set_generated_by_ai_label(True)  # noqa: attr-defined
-    context.streaming_response.set_sensitivity_label(  # noqa: attr-defined
-        SensitivityUsageInfo(
-            type="https://schema.org/Message",
-            schema_type="CreativeWork",
-            name="Internal",
-        )
-    )
-    context.streaming_response.queue_informative_update("Thinking...\n")  # noqa: attr-defined
+async def on_user_message(
+    context: TurnContext, state: TurnState
+):  # noqa: ARG001
 
     if not AZURE_AI_PROJECT_ENDPOINT or not AZURE_AI_FOUNDRY_AGENT_ID:
-        context.streaming_response.queue_text_chunk(
+        await context.send_activity(
             "Azure AI Agent client or agent ID not configured. Please check "
             "your environment variables."
         )
-        await context.streaming_response.end_stream()
         return
 
     try:
@@ -125,11 +191,35 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
             )
         )
         if not user_content:
-            context.streaming_response.queue_text_chunk(
-                "Please enter a question to receive a streamed answer."
-            )  # noqa: attr-defined
-            await context.streaming_response.end_stream()  # noqa: attr-defined
+            await context.send_activity(
+                "Please enter a question to receive an answer."
+            )
             return
+
+        # --- Manual reset command detection (exact match) ---
+        lowered = user_content.lower()
+        if lowered in RESET_COMMAND_KEYWORDS:
+            reset_conversation(conversation_id)
+            await context.send_activity(
+                "Conversation reset! Welcome back. "
+                "Ask me anything to get started."
+            )
+            return
+
+        # --- Timeout enforcement ---
+        now = datetime.now(timezone.utc)
+        last = conversation_last_activity.get(conversation_id)
+        if (
+            CONVERSATION_TIMEOUT_SECONDS > 0
+            and last is not None
+            and (now - last).total_seconds() > CONVERSATION_TIMEOUT_SECONDS
+        ):
+            reset_conversation(conversation_id)
+            await context.send_activity(
+                "Your session expired due to inactivity. Starting fresh!"
+            )
+            # We intentionally continue to process the *current* user message
+            # as the first message of a fresh conversation (do not return).
 
         agent = conversation_agents.get(conversation_id)
         thread = conversation_threads.get(conversation_id)
@@ -183,25 +273,47 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
             AZURE_AI_FOUNDRY_AGENT_ID
         )
 
+        # Configure streaming response with labels and feedback
+        context.streaming_response.set_feedback_loop(True)
+        context.streaming_response.set_generated_by_ai_label(True)
+
         chunk_count = 0
         run_id = None
-        async for chunk in agent.run_stream(
-            user_content, thread=thread, **run_kwargs
-        ):
-            # Try to extract run_id from the chunk if available
-            if run_id is None and hasattr(chunk, 'run_id'):
-                run_id = chunk.run_id
-                logger.info(
-                    "Agent run started - Conversation ID: %s, "
-                    "Thread ID: %s, Run ID: %s",
-                    conversation_id,
-                    thread_id,
-                    run_id
-                )
+        full_response = []
 
-            if chunk.text:
-                chunk_count += 1
-                context.streaming_response.queue_text_chunk(chunk.text)  # noqa: attr-defined
+        try:
+            async for chunk in agent.run_stream(
+                user_content, thread=thread, **run_kwargs
+            ):
+                # Try to extract run_id from the chunk if available
+                if run_id is None and hasattr(chunk, 'run_id'):
+                    run_id = chunk.run_id
+                    logger.info(
+                        "Agent run started - Conversation ID: %s, "
+                        "Thread ID: %s, Run ID: %s",
+                        conversation_id,
+                        thread_id,
+                        run_id
+                    )
+
+                if chunk.text:
+                    chunk_count += 1
+                    full_response.append(chunk.text)
+                    # Stream the chunk to the user
+                    context.streaming_response.queue_text_chunk(chunk.text)
+        except Exception as stream_error:
+            logger.error(
+                "Error during streaming - Conversation ID: %s, Error: %s",
+                conversation_id,
+                stream_error,
+                exc_info=True
+            )
+            context.streaming_response.queue_text_chunk(
+                "An error occurred while generating the response. "
+                "Please try again."
+            )
+        finally:
+            await context.streaming_response.end_stream()
 
         logger.info(
             "Agent run completed - Conversation ID: %s, "
@@ -212,17 +324,33 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
             chunk_count
         )
 
+        # Replace streamed text with Adaptive Card containing markdown
+        if full_response:
+            response_text = "".join(full_response)
+            card_dict = _build_response_adaptive_card(response_text)
+            context.streaming_response.set_attachments(
+                [
+                    Attachment(
+                        content_type="application/vnd.microsoft.card.adaptive",
+                        content=card_dict["attachments"][0]["content"],
+                    )
+                ]
+            )
+
+        # Update last activity timestamp only after a successful run
+        conversation_last_activity[conversation_id] = datetime.now(
+            timezone.utc
+        )
+
     except Exception as exc:  # noqa: BLE001 - broad catch to surface to user
         logger.error(
-            "Error during Agent Framework streaming - "
+            "Error during Agent Framework - "
             "Conversation ID: %s, Error: %s",
             context.activity.conversation.id,
             exc,
             exc_info=True
         )
-        context.streaming_response.queue_text_chunk(
+        await context.send_activity(
             "An error occurred while generating the answer. "
             "Please try again later."
-        )  # noqa: attr-defined
-    finally:
-        await context.streaming_response.end_stream()  # noqa: attr-defined
+        )

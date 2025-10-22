@@ -302,6 +302,8 @@ module "container_apps" {
   common_tags                            = var.common_tags
   enable_diagnostics                     = var.enable_diagnostics
   log_level                              = var.log_level
+  conversation_timeout_seconds           = var.conversation_timeout_seconds
+  reset_command_keywords                 = var.reset_command_keywords
 }
 
 

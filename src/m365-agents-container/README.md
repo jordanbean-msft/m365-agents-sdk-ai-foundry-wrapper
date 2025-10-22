@@ -64,6 +64,56 @@ At this point you should see the message
 
 The agent is ready to accept messages.
 
+## Conversation Management (Reset, Timeout & Adaptive Card)
+
+This container supports conversation lifecycle controls so users in Microsoft
+Teams (or other Bot Framework channels) can intentionally or automatically
+start fresh.
+
+### Manual Reset
+
+Send one of the reset keywords (case-insensitive, message must ONLY contain
+the keyword) to clear the current conversation state:
+
+```
+reset, restart, new
+```
+
+After a reset an Adaptive Card is returned with a "Restart Conversation"
+button (it simply re-sends the first reset keyword so behavior stays uniform).
+
+### Inactivity Timeout
+
+Set `CONVERSATION_TIMEOUT_SECONDS` (env var) to a positive integer to enable
+automatic expiration. On the next inbound message AFTER the timeout window:
+
+1. Prior conversation state (agent, thread, tool resources, timestamps) is cleared.
+2. An Adaptive Card informs the user the session expired.
+3. The current message is processed as the FIRST message of a new session.
+
+Set to `0` (default) to disable.
+
+### Environment Variables
+
+| Variable                       | Purpose                                        | Default             |
+| ------------------------------ | ---------------------------------------------- | ------------------- |
+| `RESET_COMMAND_KEYWORDS`       | Comma‑separated list of reset trigger keywords | `reset,restart,new` |
+| `CONVERSATION_TIMEOUT_SECONDS` | Inactivity seconds before auto-reset           | `0` (off)           |
+
+### Adaptive Card Customization
+
+The JSON payload is constructed in `_build_reset_adaptive_card` (see
+`src/agent.py`). Modify that helper to change wording, branding, or add
+additional actions (e.g., Help, FAQ).
+
+### Notes
+
+- Conversation state is currently in-memory; use a distributed cache (Redis,
+  Cosmos DB, etc.) if you need durability or horizontal scale.
+- Timeout evaluation is lazy (performed only when a new message arrives).
+- Manual resets and timeouts are per-conversation; other conversations are
+  unaffected.
+
 ## Health Check Endpoint
 
 The container exposes a lightweight unauthenticated liveness endpoint used by the Azure Application Gateway health probe:
