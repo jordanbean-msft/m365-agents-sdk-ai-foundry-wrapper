@@ -17,21 +17,31 @@ def _configure_root_logging() -> None:
 
     LOG_LEVEL can be overridden via environment variable. Defaults to INFO.
     """
-    root_logger = logging.getLogger()
-    if root_logger.handlers:  # already configured (hosting env)
-        return
-
     log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
     level = getattr(logging, log_level_name, logging.INFO)
 
-    logging.basicConfig(
-        level=level,
-        format=(
-            "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-        ),
-    )
+    root_logger = logging.getLogger()
 
-    # Ensure microsoft_agents logger inherits level (override possible later)
+    # Set root logger level (always do this even if handlers exist)
+    root_logger.setLevel(level)
+
+    # If handlers already exist (hosting env), update their levels
+    # instead of adding new ones
+    if root_logger.handlers:
+        for handler in root_logger.handlers:
+            handler.setLevel(level)
+    else:
+        # No handlers exist, add a new one
+        import sys
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(level)
+        formatter = logging.Formatter(
+            "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+        )
+        handler.setFormatter(formatter)
+        root_logger.addHandler(handler)
+
+    # Ensure microsoft_agents logger inherits level
     logging.getLogger("microsoft_agents").setLevel(level)
 
 
