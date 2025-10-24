@@ -20,7 +20,7 @@ dependencies = [
 dev = ["debugpy"]
 
 [project.scripts]
-azureai-foundry-streaming = "src.main:main"
+azureai-foundry-streaming = "src.app:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -1,9 +1,9 @@
-"""Configuration and wiring for the Azure AI Foundry streaming sample.
+"""Environment configuration & hosting object wiring.
 
-Centralizes env loading and construction of core SDK objects so that
-`agent.py` can focus on handlers.
+Original contents moved from the top-level `config.py` for better modularity.
+A thin compatibility shim remains in the legacy location importing these
+symbols so external imports continue to function.
 """
-
 from __future__ import annotations
 
 import logging
@@ -25,35 +25,17 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 agents_sdk_config = load_configuration_from_env(environ)
 
-# Exported environment-based constants
 AZURE_AI_PROJECT_ENDPOINT: str = environ.get("AZURE_AI_PROJECT_ENDPOINT", "")
 AZURE_AI_FOUNDRY_AGENT_ID: str = environ.get("AZURE_AI_FOUNDRY_AGENT_ID", "")
 AZURE_AI_MODEL_DEPLOYMENT_NAME: str = environ.get(
     "AZURE_AI_MODEL_DEPLOYMENT_NAME", ""
 )
 
-# Conversation management settings
-# CONVERSATION_TIMEOUT_SECONDS: if > 0, a conversation that has had no user
-# activity for this many seconds will be reset on the next incoming message
-# (before processing) and the user will receive an Adaptive Card indicating
-# the timeout. 0 (default) disables timeouts.
-try:
-    CONVERSATION_TIMEOUT_SECONDS: int = int(
-        environ.get("CONVERSATION_TIMEOUT_SECONDS", "0")
-    )
-except ValueError:  # fallback if misconfigured
-    CONVERSATION_TIMEOUT_SECONDS = 0
-
-# Comma-separated list of keywords that trigger a manual reset when sent as
-# the *entire* message content (case-insensitive). Example: "reset,restart,new"
-RAW_RESET_KEYWORDS = environ.get(
-    "RESET_COMMAND_KEYWORDS", "reset,restart,new"
-)
+RAW_RESET_KEYWORDS = environ.get("RESET_COMMAND_KEYWORDS", "reset,restart,new")
 RESET_COMMAND_KEYWORDS: List[str] = [
     k.strip().lower() for k in RAW_RESET_KEYWORDS.split(",") if k.strip()
 ]
 
-# Core hosting components
 STORAGE = MemoryStorage()
 CONNECTION_MANAGER = MsalConnectionManager(**agents_sdk_config)
 ADAPTER = CloudAdapter(connection_manager=CONNECTION_MANAGER)
@@ -66,7 +48,6 @@ AGENT_APP = AgentApplication[TurnState](
     **agents_sdk_config,
 )
 
-# Credentials (sync + async). Async credential is required by factory.
 credential = DefaultAzureCredential()
 async_credential = AsyncDefaultAzureCredential()
 
@@ -75,7 +56,6 @@ __all__ = [
     "AZURE_AI_PROJECT_ENDPOINT",
     "AZURE_AI_FOUNDRY_AGENT_ID",
     "AZURE_AI_MODEL_DEPLOYMENT_NAME",
-    "CONVERSATION_TIMEOUT_SECONDS",
     "RESET_COMMAND_KEYWORDS",
     "CONNECTION_MANAGER",
     "async_credential",

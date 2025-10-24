@@ -106,12 +106,6 @@ variable "log_level" {
   default     = "INFO"
 }
 
-variable "conversation_timeout_seconds" {
-  description = "Inactivity timeout in seconds before a conversation is auto-reset (0 = disabled)"
-  type        = number
-  default     = 0
-}
-
 variable "reset_command_keywords" {
   description = "Comma-separated list of keywords that trigger conversation reset"
   type        = string

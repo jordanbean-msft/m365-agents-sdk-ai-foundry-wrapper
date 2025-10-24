@@ -102,11 +102,6 @@ resource "azurerm_container_app" "main" {
       }
 
       env {
-        name  = "CONVERSATION_TIMEOUT_SECONDS"
-        value = tostring(var.conversation_timeout_seconds)
-      }
-
-      env {
         name  = "RESET_COMMAND_KEYWORDS"
         value = var.reset_command_keywords
       }

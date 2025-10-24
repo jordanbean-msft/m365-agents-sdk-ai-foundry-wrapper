@@ -1,16 +1,14 @@
 """Factory utilities for creating ChatAgents backed by Azure AI Foundry agents.
 
-The logic here was previously embedded in `agent.py` and has been extracted for
-clarity and testability.
+Moved from top-level `foundry_agent_factory.py`.
 """
-
 from __future__ import annotations
 
 import logging
 from typing import Any, Tuple
 
-from agent_framework import ChatAgent
-from agent_framework.azure import AzureAIAgentClient
+from agent_framework import ChatAgent  # type: ignore
+from agent_framework.azure import AzureAIAgentClient  # type: ignore
 from azure.core.credentials_async import AsyncTokenCredential
 
 logger = logging.getLogger(__name__)
@@ -32,11 +30,7 @@ async def create_chat_agent_from_foundry(
     agent_id: str,
     async_credential: AsyncTokenCredential,
 ) -> Tuple[ChatAgent, object | None]:
-    """Create a `ChatAgent` mirroring an existing Azure AI Foundry agent.
-
-    Returns a tuple of (ChatAgent, tool_resources) where tool_resources may be
-    None if the agent definition was not retrieved.
-    """
+    """Create a `ChatAgent` mirroring an existing Azure AI Foundry agent."""
     chat_client = AzureAIAgentClient(
         async_credential=async_credential,
         project_endpoint=project_endpoint,
@@ -45,9 +39,7 @@ async def create_chat_agent_from_foundry(
 
     fetched_agent: Any | None = None
     try:
-        fetched_agent = await chat_client.project_client.agents.get_agent(
-            agent_id
-        )
+        fetched_agent = await chat_client.project_client.agents.get_agent(agent_id)
     except Exception as ex:  # noqa: BLE001
         logger.warning(
             "Failed fetch Foundry agent '%s': %s. Using minimal ChatAgent.",
@@ -68,18 +60,11 @@ async def create_chat_agent_from_foundry(
                 elif tool_type == "function":
                     logger.info(
                         "Skipping function tool (no local impl): %s",
-                        getattr(
-                            getattr(tool, "function", {}),
-                            "name",
-                            "<unknown>",
-                        ),
+                        getattr(getattr(tool, "function", {}), "name", "<unknown>"),
                     )
         except Exception as tool_ex:  # noqa: BLE001
             logger.warning("Error parsing Foundry tools: %s", tool_ex)
 
-        # Deduplicate OpenAPI tool names to avoid Azure API errors.
-        # Passing both persisted agent tools and an identical set in the run
-        # payload can trigger the "OpenAPI tools must have unique names" error.
         deduped_tools: list[Any] = []
         seen_openapi_names: set[str] = set()
         for t in foundry_tools:
@@ -91,9 +76,7 @@ async def create_chat_agent_from_foundry(
                 )
                 if name:
                     if name in seen_openapi_names:
-                        logger.warning(
-                            "Skipping duplicate OpenAPI tool '%s'", name
-                        )
+                        logger.warning("Skipping duplicate OpenAPI tool '%s'", name)
                         continue
                     seen_openapi_names.add(name)
             deduped_tools.append(t)
@@ -105,14 +88,8 @@ async def create_chat_agent_from_foundry(
         chat_agent_kwargs.update(
             {
                 "name": getattr(fetched_agent, "name", None) or None,
-                "description": getattr(
-                    fetched_agent, "description", None
-                )
-                or None,
-                "instructions": getattr(
-                    fetched_agent, "instructions", None
-                )
-                or None,
+                "description": getattr(fetched_agent, "description", None) or None,
+                "instructions": getattr(fetched_agent, "instructions", None) or None,
                 "model_id": getattr(fetched_agent, "model", None) or None,
             }
         )
@@ -139,7 +116,4 @@ async def create_chat_agent_from_foundry(
     agent = ChatAgent(**chat_agent_kwargs)
     return agent, tool_resources
 
-__all__ = [
-    "create_chat_agent_from_foundry",
-    "SUPPORTED_PASSTHROUGH_TOOL_TYPES",
-]
+__all__ = ["create_chat_agent_from_foundry", "SUPPORTED_PASSTHROUGH_TOOL_TYPES"]

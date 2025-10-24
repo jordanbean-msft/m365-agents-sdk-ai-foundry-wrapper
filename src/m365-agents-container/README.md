@@ -53,13 +53,19 @@ pip install -r requirements.txt
 1. Start the application
 
 ```sh
-python -m src.main
+python -m src.app   # or: python -m src.app.bootstrap
 ```
 
-At this point you should see the message
+If installed via `pip` (editable or wheel) you can also use the console script:
+
+```sh
+azureai-foundry-streaming
+```
+
+You should then see output similar to:
 
 ```text
-======== Running on http://localhost:3978 ========
+======== Running on http://0.0.0.0:3978 ========
 ```
 
 The agent is ready to accept messages.
@@ -103,8 +109,8 @@ Set to `0` (default) to disable.
 ### Adaptive Card Customization
 
 The JSON payload is constructed in `_build_reset_adaptive_card` (see
-`src/agent.py`). Modify that helper to change wording, branding, or add
-additional actions (e.g., Help, FAQ).
+`src/api/cards.py`). Modify `build_reset_adaptive_card` there to change wording,
+branding, or add additional actions (e.g., Help, FAQ).
 
 ### Notes
 

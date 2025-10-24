@@ -20,7 +20,7 @@ Example:
         --resource-group <RG> \
         --logic-app-name <SITE> \
         --workflow-name AgentHttpWorkflow \
-        --ai-foundry-project <project_url> \
+        --ai-foundry-project-endpoint <project_url> \
         --ai-model-deployment-name gpt-4o
 """
 # flake8: max-line-length=120
@@ -30,6 +30,7 @@ import argparse
 import base64
 import io
 import json
+import logging
 import re
 import sys
 import time
@@ -55,12 +56,15 @@ MGMT_API_VERSION_WEB = "2023-01-01"       # publishing credentials
 MGMT_API_VERSION_WORKFLOW = "2022-03-01"  # callback URL
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Logging setup
 # ---------------------------------------------------------------------------
 
-
-def log(msg: str) -> None:
-    print(f"[create-workflow] {msg}")
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(levelname)s] %(message)s",
+    stream=sys.stderr,
+)
+logger = logging.getLogger(__name__)
 
 
 def load_workflow_template() -> dict:
@@ -151,7 +155,7 @@ def zip_deploy(site_name: str, user: str, pwd: str, zip_bytes: bytes) -> None:
     deploy_url = f"https://{site_name}.scm.azurewebsites.net/api/zipdeploy"
     auth = base64.b64encode(f"{user}:{pwd}".encode()).decode()
     headers = {"Authorization": f"Basic {auth}"}
-    log("Uploading ZIP package via Kudu Zip Deploy...")
+    logger.info("Uploading ZIP package via Kudu Zip Deploy...")
     resp = requests.post(
         deploy_url, headers=headers, data=zip_bytes, timeout=300
     )
@@ -168,10 +172,10 @@ def zip_deploy(site_name: str, user: str, pwd: str, zip_bytes: bytes) -> None:
         if st.status_code == 200:
             data = st.json()
             if data.get("complete") and data.get("status") == 4:
-                log("Deployment completed successfully.")
+                logger.info("Deployment completed successfully.")
                 return
         else:
-            log(f"Polling attempt {attempt} got {st.status_code}")
+            logger.debug(f"Polling attempt {attempt} got {st.status_code}")
     raise RuntimeError("Deployment did not complete in allotted time.")
 
 
@@ -301,13 +305,18 @@ def create_or_update_custom_key_connection(
         "Authorization": f"Bearer {management_token}",
         "Content-Type": "application/json",
     }
-    log(f"Creating/updating CustomKeys connection '{connection_name}'...")
+    logger.info(
+        f"Creating/updating CustomKeys connection '{connection_name}'..."
+    )
     resp = requests.put(url, headers=headers, json=payload, timeout=60)
     if resp.status_code not in (200, 201):
         raise RuntimeError(
             f"Conn {connection_name} failed: {resp.status_code} {resp.text}"
         )
-    log(f"Connection '{connection_name}' ready (status {resp.status_code}).")
+    logger.info(
+        f"Connection '{connection_name}' ready "
+        f"(status {resp.status_code})."
+    )
 
 
 def register_openapi_tool(
@@ -320,12 +329,12 @@ def register_openapi_tool(
     resource_group: str,
 ) -> str:
     """Register (or update) an agent with an OpenAPI tool; return agent id."""
-    log("Registering OpenAPI tool in AI Foundry...")
+    logger.info("Registering OpenAPI tool in AI Foundry...")
     credential = DefaultAzureCredential()
     if not project.startswith("https://"):
         raise ValueError("Invalid project endpoint format")
     endpoint = project
-    log(f"Using AI Foundry project endpoint: {endpoint}")
+    logger.info(f"Using AI Foundry project endpoint: {endpoint}")
     project_client = AIProjectClient(credential=credential, endpoint=endpoint)
     client = project_client.agents
     openapi_spec, params = build_openapi_spec(workflow_name, callback_url)
@@ -379,12 +388,12 @@ def register_openapi_tool(
         default_params=default_params,
     )
     tool_definition = OpenApiToolDefinition(openapi=openapi_function)
-    log(f"Creating/updating agent with OpenAPI tool: {tool_name}")
+    logger.info(f"Creating/updating agent with OpenAPI tool: {tool_name}")
     agents = client.list_agents()
     agent_name = f"LogicApp-{workflow_name}-Agent"
     existing_agent = next((a for a in agents if a.name == agent_name), None)
     if existing_agent:
-        log(f"Updating existing agent: {existing_agent.id}")
+        logger.info(f"Updating existing agent: {existing_agent.id}")
         client.update_agent(
             agent_id=existing_agent.id,
             name=agent_name,
@@ -397,10 +406,10 @@ def register_openapi_tool(
             tools=[tool_definition],
             model=model_deployment_name,
         )
-        log(f"Agent updated: {existing_agent.id}")
+        logger.info(f"Agent updated: {existing_agent.id}")
         agent_id = existing_agent.id
     else:
-        log(f"Creating new agent: {agent_name}")
+        logger.info(f"Creating new agent: {agent_name}")
         agent = client.create_agent(
             model=model_deployment_name,
             name=agent_name,
@@ -412,9 +421,9 @@ def register_openapi_tool(
             ),
             tools=[tool_definition],
         )
-        log(f"Agent created: {agent.id}")
+        logger.info(f"Agent created: {agent.id}")
         agent_id = agent.id
-    log("OpenAPI tool registered successfully.")
+    logger.info("OpenAPI tool registered successfully.")
     return agent_id
 
 
@@ -435,10 +444,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Logic App Standard site name",
     )
     p.add_argument(
-        "--ai-foundry-project",
+        "--ai-foundry-project-endpoint",
         required=True,
         dest="ai_foundry_project",
-        help="AI Foundry project endpoint base URL",
+        help=(
+            "AI Foundry project endpoint URL "
+            "(e.g., https://account.services.ai.azure.com/api/"
+            "projects/projectname)"
+        ),
     )
     p.add_argument(
         "--ai-model-deployment-name",
@@ -458,11 +471,22 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Print full traceback on error for troubleshooting",
     )
+    p.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose logging (DEBUG level)",
+    )
     return p.parse_args(argv)
 
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
+
+    # Configure logging level based on verbose flag
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     subscription_id = args.subscription_id
     resource_group = args.resource_group
     logic_app_name = args.logic_app_name
@@ -479,14 +503,14 @@ def main(argv: list[str]) -> int:
         ai_foundry_project = str(ai_foundry_project)
         ai_model_deployment_name = str(ai_model_deployment_name)
         token = get_access_token()
-        log("Acquired management access token.")
+        logger.info("Acquired management access token.")
         user, pwd = get_publishing_credentials(
             subscription_id,
             resource_group,
             logic_app_name,
             token,
         )
-        log("Retrieved publishing credentials.")
+        logger.info("Retrieved publishing credentials.")
         zip_bytes = build_zip_package(workflow_name)
         zip_deploy(logic_app_name, user, pwd, zip_bytes)
         callback_url = get_trigger_callback_url(
@@ -496,7 +520,7 @@ def main(argv: list[str]) -> int:
             workflow_name,
             token,
         )
-        log(
+        logger.info(
             "Workflow deployed. Manual trigger callback URL:\n"
             f"{callback_url}"
         )
@@ -519,11 +543,11 @@ def main(argv: list[str]) -> int:
             "tool_name": tool_name,
             "callback_url": callback_url,
         }
-        log("Emitting deployment output JSON")
+        logger.info("Emitting deployment output JSON")
         print(json.dumps(output_payload, indent=2))
         return 0
     except AzureError as az_ex:
-        log(f"AzureError: {az_ex}")
+        logger.error(f"AzureError: {az_ex}")
         if args.debug:
             traceback.print_exc()
         return 1
@@ -533,7 +557,7 @@ def main(argv: list[str]) -> int:
         AzureError,
         requests.RequestException,
     ) as ex:
-        log(f"Error: {ex}")
+        logger.error(f"Error: {ex}")
         if args.debug:
             traceback.print_exc()
         return 1

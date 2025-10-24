@@ -326,7 +326,7 @@ uv run create_default_logicapp_workflow.py \
   --resource-group "$RESOURCE_GROUP" \
   --logic-app-name "$LOGIC_APP_NAME" \
   --workflow-name AgentHttpWorkflow \
-  --ai-foundry-project "$AI_FOUNDRY_PROJECT_ENDPOINT" \
+  --ai-foundry-project-endpoint "$AI_FOUNDRY_PROJECT_ENDPOINT" \
   --ai-model-deployment-name "$AI_MODEL_DEPLOYMENT_NAME" \
   --tool-name logicapp_workflow_tool \
   > workflow_output.json
