@@ -1,6 +1,6 @@
 # M365 Agents SDK – AI Foundry Wrapper
 
-![architecture](./.img/architecture.png)
+![architecture](./.img/architecture.drawio.png)
 
 This repository provisions a secure, private Azure landing zone (Storage, Cosmos DB, AI Search, AI Foundry, Logic App Standard, Container Apps, ACR) for building agent-powered Microsoft 365 integrations. All resources are deployed with network isolation (private endpoints + VNet integration) and least-privilege identities.
 
