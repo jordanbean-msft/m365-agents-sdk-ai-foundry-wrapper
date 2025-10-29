@@ -364,10 +364,34 @@ Runtime environment variables (project endpoint, model deployment name, agent id
 
 ### Build & Push Image
 
-Build & push using exported variables (bash supports both $VAR and ${VAR}, either is fine; quoting recommended):
+Build & push using exported variables (bash supports both $VAR and ${VAR}, either is fine; quoting recommended).
+
+> ⚠️ **Platform Requirement (linux/amd64)**: Azure Container Apps currently runs containers on linux/amd64. If you build on an arm64 host (e.g. Apple Silicon) without specifying the platform, the resulting image may not run. Always force builds to `linux/amd64`.
+
+Choose ONE of the following build approaches:
+
+1. BuildX explicit platform:
 
 ```bash
+docker buildx build --platform linux/amd64 -t "$ACR_LOGIN_SERVER/m365-agents-wrapper:v1" ./src/m365-agents-container
+```
+
+2. Single-command env override:
+
+```bash
+DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -t "$ACR_LOGIN_SERVER/m365-agents-wrapper:v1" ./src/m365-agents-container
+```
+
+3. Session export (affects subsequent docker builds):
+
+```bash
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
 docker build -t "$ACR_LOGIN_SERVER/m365-agents-wrapper:v1" ./src/m365-agents-container
+```
+
+Then push:
+
+```bash
 az acr login --name "$ACR_NAME"
 docker push "$ACR_LOGIN_SERVER/m365-agents-wrapper:v1"
 ```

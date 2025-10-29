@@ -71,6 +71,22 @@ This repository provisions a secure, modular Azure infrastructure for AI Foundry
 - **Container Apps:**
   - Deployed with VNet integration, private ACR, and managed identities. Ingress is internal-only by default.
 
+## Container Image Architecture Requirement
+
+Azure Container Apps currently schedules workloads on linux/amd64. All Docker images referenced via the `container_image` Terraform variable MUST be built for `linux/amd64`. If you are on an arm64 development machine (Apple Silicon, newer ARM laptops, etc.), always force the platform during builds:
+
+```
+docker buildx build --platform linux/amd64 -t <acr-login-server>/<repo>:<tag> .
+```
+
+or
+
+```
+DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -t <acr-login-server>/<repo>:<tag> .
+```
+
+Failing to do this can result in startup failures or crash loops in the Container App revision. Keep this requirement documented whenever adding new build automation.
+
 ## Examples
 
 - **Adding a new environment:** Copy and adjust `terraform.tfvars` for the new environment. Ensure all required subnets exist.
@@ -96,3 +112,6 @@ This repository provisions a secure, modular Azure infrastructure for AI Foundry
 - Maintain strict network isolation and least-privilege access patterns. Add/modify NSG rules only in `modules/nsgs` to keep security centralized.
 - Use outputs and variables to connect modules—avoid hardcoding resource IDs.
 - Document any new patterns or workflows in the appropriate module README.
+- If you deploy code using the Azure CLI, those changes need to be reflected in Terraform to avoid drift. This includes Docker image versions, configuration changes, and role assignments.
+- When creating private endpoints, always include the lifecycle block to ignore changes to `private_dns_zone_group` to prevent drift issues.
+- Follow the established naming conventions and tagging strategies to ensure consistency across resources.

@@ -351,6 +351,19 @@ resource "azurerm_role_assignment" "uami_ai_foundry_user" {
   provider = azurerm.workload_subscription
 }
 
+## RBAC: Grant Azure AI Developer role to the user-assigned identity on AI Foundry Project scope
+## Required for agents API access with managed identity authentication
+resource "azurerm_role_assignment" "uami_ai_developer_project" {
+  scope                = module.project.ai_foundry_project_id
+  role_definition_name = "Azure AI Developer"
+  principal_id         = module.identity.user_assigned_identity_principal_id
+  depends_on = [
+    module.project,
+    module.identity
+  ]
+  provider = azurerm.workload_subscription
+}
+
 ## Upload PFX certificate to Key Vault
 ##
 resource "azurerm_key_vault_certificate" "appgw_cert" {

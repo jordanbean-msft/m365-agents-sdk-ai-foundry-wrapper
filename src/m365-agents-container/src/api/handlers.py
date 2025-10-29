@@ -6,15 +6,14 @@ import re
 import time
 from typing import Any, Dict, List, Optional
 
+from azure.identity.aio import DefaultAzureCredential
 from microsoft_agents.activity import Activity, ActivityTypes, Attachment
 from microsoft_agents.hosting.core import TurnContext, TurnState
 
-from ..agents import (conversation_agents, conversation_threads,
-                      conversation_tool_resources,
+from ..agents import (conversation_threads, conversation_tool_resources,
                       create_chat_agent_from_foundry, reset_conversation)
 from ..app.config import (AGENT_APP, AZURE_AI_FOUNDRY_AGENT_ID,
-                          AZURE_AI_PROJECT_ENDPOINT, RESET_COMMAND_KEYWORDS,
-                          async_credential)
+                          AZURE_AI_PROJECT_ENDPOINT, RESET_COMMAND_KEYWORDS)
 from .cards import build_response_adaptive_card
 from .streaming import queue_status_update
 
@@ -94,21 +93,25 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
             )
             return
 
-        agent = conversation_agents.get(conversation_id)
-        thread = conversation_threads.get(conversation_id)
-        if not agent:
-            agent, tool_resources = await create_chat_agent_from_foundry(
-                project_endpoint=AZURE_AI_PROJECT_ENDPOINT,
-                agent_id=AZURE_AI_FOUNDRY_AGENT_ID,
-                async_credential=async_credential,
-            )
-            if tool_resources is not None:
-                conversation_tool_resources[conversation_id] = tool_resources
-            conversation_agents[conversation_id] = agent
-            logger.info("Created new ChatAgent for conversation %s", conversation_id)
-        else:
-            logger.info("Reusing ChatAgent for conversation %s", conversation_id)
+        # Always create fresh agent with new credentials to avoid
+        # token expiration (credentials expire after ~1 hour).
+        # Create fresh credential instance per request to ensure
+        # tokens are not cached and can be refreshed.
+        fresh_credential = DefaultAzureCredential()
+        agent, tool_resources = await create_chat_agent_from_foundry(
+            project_endpoint=AZURE_AI_PROJECT_ENDPOINT,
+            agent_id=AZURE_AI_FOUNDRY_AGENT_ID,
+            async_credential=fresh_credential,
+        )
+        if tool_resources is not None:
+            conversation_tool_resources[conversation_id] = tool_resources
+        logger.info(
+            "Created ChatAgent with fresh credentials for conversation %s",
+            conversation_id,
+        )
 
+        # Reuse thread if it exists (threads don't hold auth tokens)
+        thread = conversation_threads.get(conversation_id)
         if not thread:
             thread = agent.get_new_thread()
             conversation_threads[conversation_id] = thread
@@ -137,6 +140,21 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
             thread_id,
             AZURE_AI_FOUNDRY_AGENT_ID,
         )
+
+        # If streaming is enabled we suppress textual token streaming to avoid duplicate
+        # final content (user wants only the adaptive card). We monkey patch queue_text_chunk
+        # and queueTextChunk to no-op while leaving informative updates intact.
+        if hasattr(context, "streaming_response") and context.streaming_response:
+            sr = context.streaming_response
+            for attr in ["queue_text_chunk", "queueTextChunk"]:
+                if hasattr(sr, attr):
+                    original = getattr(sr, attr)
+                    if callable(original):
+                        try:
+                            setattr(sr, attr, lambda *a, **kw: None)
+                            logger.debug("Suppressed streaming text via monkey patch: %s", attr)
+                        except Exception as patch_exc:  # noqa: BLE001
+                            logger.debug("Failed monkey patching %s: %s", attr, patch_exc)
 
         start_time = time.time()
         chunk_count = 0
@@ -285,43 +303,49 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
                 content=card_dict["attachments"][0]["content"],
             )
 
-            # Use streaming response to properly clear informative updates
-            if (
-                hasattr(context, "streaming_response")
-                and context.streaming_response
-            ):
-                # Queue a text chunk to transition from informative
-                # to streaming mode - this clears the informative update
-                context.streaming_response.queue_text_chunk(" ")
-                # Set attachments for the final message
-                context.streaming_response.set_attachments([card_attachment])
-                # Set feedback loop
-                context.streaming_response.set_feedback_loop(True)
-                context.streaming_response.set_feedback_loop_type("custom")
-                # End stream - sends final message with attachments
-                await context.streaming_response.end_stream()
-            else:
-                # Fallback to regular activity if streaming not available
-                sender_final = getattr(
-                    context.activity, "from_property", None
-                ) or getattr(context.activity, "recipient", None)
-                final_activity = Activity(
-                    **{
-                        "type": ActivityTypes.message,
-                        "attachments": [card_attachment],
-                        "entities": [
-                            {
-                                "type": "https://schema.org/Message",
-                                "@type": "Message",
-                                "@context": "https://schema.org",
-                                "additionalType": ["AIGeneratedContent"],
-                            }
-                        ],
-                        "channel_data": {"feedbackLoop": {"type": "custom"}},
-                        **({"from": sender_final} if sender_final else {}),
-                    }
-                )
-                await context.send_activity(final_activity)
+            # Preferred path: use streaming completion so initial status messages clear.
+            # Per Microsoft docs: Only set attachments, do NOT set any final text to avoid placeholder.
+            # The SDK will send the card-only message when end_stream() is called.
+            if hasattr(context, "streaming_response") and context.streaming_response:
+                sr = context.streaming_response
+                # Attach adaptive card (only allowed on final chunk per docs)
+                try:
+                    sr.set_attachments([card_attachment])
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("Failed to set attachments on streaming_response: %s", exc)
+                # Enable feedback loop labeling
+                try:
+                    sr.set_feedback_loop(True)
+                    sr.set_feedback_loop_type("custom")
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("Failed to set feedback loop properties: %s", exc)
+                # End the stream (sends final message with card only, no text). If this fails fall back to normal activity send.
+                try:
+                    await sr.end_stream()
+                    return
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Streaming end failed; falling back to normal activity delivery: %s", exc)
+            # Fallback: send final adaptive card as normal activity
+            sender_final = getattr(context.activity, "from_property", None) or getattr(
+                context.activity, "recipient", None
+            )
+            final_activity = Activity(
+                **{
+                    "type": ActivityTypes.message,
+                    "attachments": [card_attachment],
+                    "entities": [
+                        {
+                            "type": "https://schema.org/Message",
+                            "@type": "Message",
+                            "@context": "https://schema.org",
+                            "additionalType": ["AIGeneratedContent"],
+                        }
+                    ],
+                    "channel_data": {"feedbackLoop": {"type": "custom"}},
+                    **({"from": sender_final} if sender_final else {}),
+                }
+            )
+            await context.send_activity(final_activity)
         else:
             await context.send_activity(
                 "I received your message but didn't generate a response. "
