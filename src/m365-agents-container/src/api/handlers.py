@@ -324,7 +324,8 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
                     await sr.end_stream()
                     return
                 except Exception as exc:  # noqa: BLE001
-                    logger.warning("Streaming end failed; falling back to normal activity delivery: %s", exc)
+                    logger.warning(
+                        "Streaming end failed; falling back to normal activity delivery: %s", exc)
             # Fallback: send final adaptive card as normal activity
             sender_final = getattr(context.activity, "from_property", None) or getattr(
                 context.activity, "recipient", None
