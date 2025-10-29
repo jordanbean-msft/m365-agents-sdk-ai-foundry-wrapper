@@ -1,0 +1,63 @@
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python tools cache
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environment files (use env.TEMPLATE as reference, not actual .env)
+.env
+.env.local
+
+# Git
+.git/
+.gitignore
+.gitkeep
+
+# Documentation and diagrams
+*.md
+*.drawio.png
+*.drawio
+
+# Development and testing files
+test_*.py
+*_test.py
+tests/
+devTools/
+
+# Package manager files (not needed after install)
+uv.lock
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Terraform and infrastructure
+*.tfstate
+*.tfvars
+*.tf
+
+# App package (if not needed in container)
+appPackage/

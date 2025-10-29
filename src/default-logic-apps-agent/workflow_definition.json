@@ -1,0 +1,87 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "actions": {
+            "Processing_Scope": {
+                "type": "Scope",
+                "actions": {
+                    "Process_Input": {
+                        "type": "Compose",
+                        "inputs": {
+                            "echo": "@triggerBody()?['inputParam']",
+                            "workflow": "@workflow().name",
+                            "timestamp": "@utcNow()"
+                        },
+                        "runAfter": {}
+                    }
+                },
+                "runAfter": {}
+            },
+            "Response_Scope": {
+                "type": "Scope",
+                "actions": {
+                    "Success_Response": {
+                        "type": "Response",
+                        "kind": "Http",
+                        "inputs": {
+                            "statusCode": 200,
+                            "body": "@outputs('Process_Input')"
+                        },
+                        "runAfter": {}
+                    }
+                },
+                "runAfter": {
+                    "Processing_Scope": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Error_Response_Scope": {
+                "type": "Scope",
+                "actions": {
+                    "Error_Response": {
+                        "type": "Response",
+                        "kind": "Http",
+                        "inputs": {
+                            "statusCode": 500,
+                            "body": {
+                                "error": "Processing failed",
+                                "details": "@result('Processing_Scope')"
+                            }
+                        },
+                        "runAfter": {}
+                    }
+                },
+                "runAfter": {
+                    "Processing_Scope": [
+                        "Failed",
+                        "TimedOut",
+                        "Skipped"
+                    ]
+                }
+            }
+        },
+        "outputs": {},
+        "triggers": {
+            "When_an_HTTP_request_is_received": {
+                "type": "Request",
+                "kind": "Http",
+                "inputs": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "inputParam": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "inputParam"
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    "kind": "Stateful"
+}

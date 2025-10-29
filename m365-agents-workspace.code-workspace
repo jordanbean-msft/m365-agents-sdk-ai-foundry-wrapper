@@ -1,0 +1,37 @@
+{
+	"folders": [
+		{
+			"name": "Root",
+			"path": "."
+		},
+		{
+			"name": "Infrastructure",
+			"path": "infra"
+		},
+		{
+			"name": "Default Logic App Agent",
+			"path": "src/default-logic-apps-agent"
+		},
+		{
+			"name": "M365 Agents Container",
+			"path": "src/m365-agents-container"
+		}
+	],
+	"settings": {
+		"files.exclude": {
+			"**/.git": true,
+			"**/.terraform": true,
+			"**/__pycache__": true,
+			"**/*.pyc": true,
+			"**/.pytest_cache": true,
+			"**/.venv": true,
+			"**/node_modules": true
+		},
+		"search.exclude": {
+			"**/.terraform": true,
+			"**/node_modules": true,
+			"**/.venv": true,
+			"**/__pycache__": true
+		}
+	}
+}

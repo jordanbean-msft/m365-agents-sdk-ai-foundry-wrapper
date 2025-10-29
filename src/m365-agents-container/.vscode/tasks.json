@@ -1,0 +1,25 @@
+{
+  // Automatically install/update dependencies via uv before debugging
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "uv sync",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "sync",
+        "--extra",
+        "dev",
+        "--prerelease=allow"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

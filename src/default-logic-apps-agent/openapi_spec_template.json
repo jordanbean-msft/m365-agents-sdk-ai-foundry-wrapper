@@ -1,0 +1,132 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Logic App Workflow PLACEHOLDER",
+    "version": "1.0.0",
+    "description": "Auto-generated OpenAPI spec for Logic App workflow HTTP trigger"
+  },
+  "default_params": ["api-version", "sp", "sv"],
+  "functions": [
+    {
+      "name": "logicapp_workflow_tool_When_an_HTTP_request_is_received-invoke",
+      "description": "Logic App workflow PLACEHOLDER",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "inputParam": {
+            "type": "string",
+            "description": "Input parameter for the workflow"
+          }
+        },
+        "required": ["inputParam"]
+      }
+    }
+  ],
+  "servers": [
+    {
+      "url": "BASE_URL_PLACEHOLDER"
+    }
+  ],
+  "security": [
+    {
+      "sig": []
+    }
+  ],
+  "paths": {
+    "/invoke": {
+      "post": {
+        "operationId": "invoke_PLACEHOLDER",
+        "summary": "Invoke Logic App workflow PLACEHOLDER",
+        "description": "Invoke Logic App workflow PLACEHOLDER",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "description": "API version for the request",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "2022-05-01"
+            }
+          },
+          {
+            "name": "sv",
+            "in": "query",
+            "description": "The version number",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "1.0"
+            }
+          },
+          {
+            "name": "sp",
+            "in": "query",
+            "description": "The permissions",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "inputParam": {
+                    "type": "string",
+                    "description": "Input parameter for the workflow"
+                  }
+                },
+                "required": [
+                  "inputParam"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "echo": {
+                      "type": "string",
+                      "description": "Echoed input parameter"
+                    },
+                    "workflow": {
+                      "type": "string",
+                      "description": "Name of the workflow that processed the request"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "UTC timestamp of the response"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sig": {
+        "type": "apiKey",
+        "description": "The SHA 256 hash signature for Logic Apps authentication",
+        "name": "sig",
+        "in": "query"
+      }
+    }
+  }
+}
