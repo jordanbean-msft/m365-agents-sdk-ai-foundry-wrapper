@@ -111,6 +111,27 @@ resource "azurerm_container_app" "main" {
         value = var.enable_response_metadata_card ? "true" : "false"
       }
 
+      ## Observability configuration
+      env {
+        name  = "ENABLE_SENSITIVE_DATA"
+        value = var.enable_sensitive_data ? "true" : "false"
+      }
+
+      ## Telemetry enable flag (Option A bootstrap relies on ENABLE_OTEL=true or Application Insights connection string)
+      env {
+        name  = "ENABLE_OTEL"
+        value = var.enable_otel ? "true" : "false"
+      }
+
+      ## Optional OTEL resource attributes for richer tracing metadata
+      dynamic "env" {
+        for_each = var.otel_resource_attributes != null ? [1] : []
+        content {
+          name  = "OTEL_RESOURCE_ATTRIBUTES"
+          value = var.otel_resource_attributes
+        }
+      }
+
       dynamic "env" {
         for_each = var.application_insights_connection_string != null ? [1] : []
         content {

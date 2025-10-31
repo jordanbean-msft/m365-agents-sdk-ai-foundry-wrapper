@@ -100,6 +100,18 @@ variable "application_insights_connection_string" {
   sensitive   = true
 }
 
+variable "enable_otel" {
+  description = "Enable OpenTelemetry instrumentation in the container (sets ENABLE_OTEL env var)"
+  type        = bool
+  default     = false
+}
+
+variable "otel_resource_attributes" {
+  description = "Optional OTEL_RESOURCE_ATTRIBUTES value (e.g. service.name=m365-agents-container,service.version=1.0.0). If null, env var not set."
+  type        = string
+  default     = null
+}
+
 variable "log_level" {
   description = "Application log level exposed to the container via LOG_LEVEL environment variable (e.g., DEBUG, INFO, WARNING, ERROR)."
   type        = string
@@ -114,6 +126,12 @@ variable "reset_command_keywords" {
 
 variable "enable_response_metadata_card" {
   description = "Feature flag: when true, container streams an additional metadata adaptive card after responses"
+  type        = bool
+  default     = false
+}
+
+variable "enable_sensitive_data" {
+  description = "Enable logging of sensitive data in Application Insights (use only for debugging; default false for production security)"
   type        = bool
   default     = false
 }

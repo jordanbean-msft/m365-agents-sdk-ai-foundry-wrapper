@@ -16,12 +16,25 @@ This repository provisions a secure, modular Azure infrastructure for AI Foundry
 ## Developer Workflows
 
 - **Terraform root is `infra/`**. Run all Terraform commands from this directory.
-- **Standard workflow:**
+- **Required pre-step: build & push container image BEFORE Terraform plan/apply**
+  - Always build the Docker image for the container app first so the tag exists when Terraform updates the revision.
+  - Use linux/amd64 platform flag (Container Apps scheduling requirement already documented below).
+  - Example sequence (adjust repo/tag as needed):
+    - `docker buildx build --platform linux/amd64 -t <acr-login-server>/<repo>:<tag> .`
+    - `docker push <acr-login-server>/<repo>:<tag>`
+  - Only after the image is pushed should you run Terraform so the new revision can pull successfully.
+- **Standard workflow (single reusable plan file):**
   1. `terraform fmt -recursive`
   2. `terraform init`
   3. `terraform validate`
-  4. `terraform plan`
-  5. `terraform apply`
+  4. `terraform plan -out tfplan` ← Always overwrite `tfplan` (do not create ad-hoc filenames)
+  5. Review plan output if needed
+  6. `terraform apply tfplan` (must apply the exact plan you just generated)
+  - Re-run steps 4–6 for subsequent changes; the previous `tfplan` is intentionally overwritten to avoid stale plans.
+- **Rationale for single `tfplan` file:**
+  - Prevents accumulation of outdated plan artifacts.
+  - Ensures you always apply what you just reviewed.
+  - Simplifies CI scripts and local workflows.
 - **Variables:**
   - All environment-specific values are set in `infra/terraform.tfvars`.
   - Subnet IDs must reference pre-existing subnets in your VNet (see module READMEs for required properties).

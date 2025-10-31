@@ -7,6 +7,43 @@ module "foundation" {
   source = "./modules/foundation"
 }
 
+## Log Analytics workspace (creates new if log_analytics_workspace_id not supplied)
+module "log_analytics" {
+  source = "./modules/log-analytics"
+  providers = {
+    azurerm = azurerm.workload_subscription
+  }
+  existing_workspace_id = var.log_analytics_workspace_id
+  name                  = "law-${module.foundation.unique_suffix}"
+  location              = var.location
+  resource_group_name   = var.resource_group_name_resources
+  retention_in_days     = 30
+  tags                  = var.common_tags
+}
+
+## Application Insights (creates new if application_insights_id not supplied)
+module "application_insights" {
+  source = "./modules/application-insights"
+  providers = {
+    azurerm = azurerm.workload_subscription
+  }
+  existing_application_insights_id = var.application_insights_id
+  name                             = "appi-${module.foundation.unique_suffix}"
+  location                         = var.location
+  resource_group_name              = var.resource_group_name_resources
+  workspace_id                     = module.log_analytics.workspace_id
+  application_type                 = "web"
+  tags                             = var.common_tags
+}
+
+locals {
+  effective_log_analytics_workspace_id               = module.log_analytics.workspace_id
+  effective_application_insights_id                  = module.application_insights.application_insights_id
+  effective_application_insights_connection_string   = module.application_insights.connection_string
+  effective_application_insights_app_id              = module.application_insights.app_id
+  effective_application_insights_instrumentation_key = module.application_insights.instrumentation_key
+}
+
 ## NSGs module - Attaches Network Security Groups to existing subnets
 ##
 module "nsgs" {
@@ -44,7 +81,7 @@ module "storage" {
   resource_group_name        = var.resource_group_name_resources
   location                   = var.location
   subscription_id            = var.subscription_id_resources
-  log_analytics_workspace_id = var.log_analytics_workspace_id
+  log_analytics_workspace_id = local.effective_log_analytics_workspace_id
   common_tags                = var.common_tags
   enable_diagnostics         = var.enable_diagnostics
 }
@@ -64,9 +101,9 @@ module "ai_foundry" {
   location                               = var.location
   subscription_id                        = var.subscription_id_resources
   subnet_id_agent                        = var.subnet_id_agent
-  log_analytics_workspace_id             = var.log_analytics_workspace_id
-  application_insights_id                = var.application_insights_id
-  application_insights_connection_string = var.application_insights_id != null ? data.azurerm_application_insights.existing[0].connection_string : null
+  log_analytics_workspace_id             = local.effective_log_analytics_workspace_id
+  application_insights_id                = var.application_insights_id # Pass original user input, not computed value
+  application_insights_connection_string = local.effective_application_insights_connection_string
   common_tags                            = var.common_tags
   enable_diagnostics                     = var.enable_diagnostics
 }
@@ -130,8 +167,8 @@ module "project" {
   pe_cosmosdb_id                         = module.networking.pe_cosmosdb_id
   pe_aisearch_id                         = module.networking.pe_aisearch_id
   pe_aifoundry_id                        = module.networking.pe_aifoundry_id
-  application_insights_id                = var.application_insights_id
-  application_insights_connection_string = var.application_insights_id != null ? data.azurerm_application_insights.existing[0].connection_string : null
+  application_insights_id                = local.effective_application_insights_id
+  application_insights_connection_string = local.effective_application_insights_connection_string
   common_tags                            = var.common_tags
 }
 
@@ -156,8 +193,8 @@ module "logic_apps" {
   user_assigned_identity_id              = module.identity.user_assigned_identity_id
   user_assigned_identity_principal_id    = module.identity.user_assigned_identity_principal_id
   website_dns_server                     = var.logic_apps_website_dns_server
-  log_analytics_workspace_id             = var.log_analytics_workspace_id
-  application_insights_connection_string = var.application_insights_id != null ? data.azurerm_application_insights.existing[0].connection_string : null
+  log_analytics_workspace_id             = local.effective_log_analytics_workspace_id
+  application_insights_connection_string = local.effective_application_insights_connection_string
   common_tags                            = var.common_tags
   enable_diagnostics                     = var.enable_diagnostics
 }
@@ -195,7 +232,7 @@ module "key_vault" {
   location                   = var.location
   subnet_id_private_endpoint = var.subnet_id_private_endpoint
   tenant_id                  = var.tenant_id
-  log_analytics_workspace_id = var.log_analytics_workspace_id
+  log_analytics_workspace_id = var.log_analytics_workspace_id # Pass original user input, not computed value
   common_tags                = var.common_tags
   enable_diagnostics         = var.enable_diagnostics
 }
@@ -259,7 +296,7 @@ module "acr" {
   sku                        = "Premium"
   pull_principal_id          = module.identity.user_assigned_identity_principal_id
   subnet_id_private_endpoint = var.subnet_id_private_endpoint
-  log_analytics_workspace_id = var.log_analytics_workspace_id
+  log_analytics_workspace_id = local.effective_log_analytics_workspace_id
   common_tags                = var.common_tags
   enable_diagnostics         = var.enable_diagnostics
 }
@@ -297,13 +334,16 @@ module "container_apps" {
   azure_client_id                        = module.identity.user_assigned_identity_client_id
   registry_server                        = module.acr.acr_login_server
   user_assigned_identity_id              = module.identity.user_assigned_identity_id
-  log_analytics_workspace_id             = var.log_analytics_workspace_id
-  application_insights_connection_string = var.application_insights_id != null ? data.azurerm_application_insights.existing[0].connection_string : null
+  log_analytics_workspace_id             = local.effective_log_analytics_workspace_id
+  application_insights_connection_string = local.effective_application_insights_connection_string
   common_tags                            = var.common_tags
   enable_diagnostics                     = var.enable_diagnostics
   log_level                              = var.log_level
   reset_command_keywords                 = var.reset_command_keywords
   enable_response_metadata_card          = var.enable_response_metadata_card
+  enable_sensitive_data                  = var.enable_sensitive_data
+  enable_otel                            = var.enable_otel
+  otel_resource_attributes               = var.otel_resource_attributes
 }
 
 
@@ -332,9 +372,9 @@ module "bot_service" {
   enable_webchat                           = var.enable_bot_webchat
   enable_teams                             = var.enable_bot_teams
   enable_m365                              = var.enable_bot_m365
-  log_analytics_workspace_id               = var.log_analytics_workspace_id
-  application_insights_app_id              = var.application_insights_id != null ? data.azurerm_application_insights.existing[0].app_id : null
-  application_insights_instrumentation_key = var.application_insights_id != null ? data.azurerm_application_insights.existing[0].instrumentation_key : null
+  log_analytics_workspace_id               = local.effective_log_analytics_workspace_id
+  application_insights_app_id              = local.effective_application_insights_app_id
+  application_insights_instrumentation_key = local.effective_application_insights_instrumentation_key
   common_tags                              = var.common_tags
   enable_diagnostics                       = var.enable_diagnostics
 }
@@ -403,7 +443,7 @@ module "app_gateway" {
   location                            = var.location
   subnet_id_app_gateway               = var.subnet_id_app_gateway
   container_app_fqdn                  = module.container_apps.container_app_fqdn
-  log_analytics_workspace_id          = var.log_analytics_workspace_id
+  log_analytics_workspace_id          = local.effective_log_analytics_workspace_id
   common_tags                         = var.common_tags
   enable_diagnostics                  = var.enable_diagnostics
   key_vault_certificate_secret_id     = azurerm_key_vault_certificate.appgw_cert.secret_id
