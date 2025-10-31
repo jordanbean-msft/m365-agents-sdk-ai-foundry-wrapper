@@ -13,7 +13,6 @@ from azure.core.credentials_async import AsyncTokenCredential
 
 logger = logging.getLogger(__name__)
 
-
 SUPPORTED_PASSTHROUGH_TOOL_TYPES: set[str] = {
     "code_interpreter",
     "file_search",
@@ -32,25 +31,16 @@ async def create_chat_agent_from_foundry(
     async_credential: AsyncTokenCredential,
 ) -> Tuple[ChatAgent, object | None]:
     """Create a `ChatAgent` mirroring an existing Azure AI Foundry agent.
-    
+
     Per Microsoft Agent Framework documentation, pass credentials directly
     to AzureAIAgentClient - the SDK handles token scopes internally.
+
+    Args:
+        project_endpoint: Azure AI Foundry project endpoint
+        agent_id: Agent ID in Azure AI Foundry
+        async_credential: Async credential for authentication
     """
-    
-    # DEBUG: Get token from managed identity to inspect its audience
-    try:
-        scope = "https://ai.azure.com/.default"
-        token = await async_credential.get_token(scope)
-        logger.info("=" * 80)
-        logger.info("MANAGED IDENTITY TOKEN (ai.azure.com scope):")
-        logger.info("Token: %s", token.token)
-        logger.info("Expires on: %s", token.expires_on)
-        logger.info("=" * 80)
-    except Exception as token_ex:
-        logger.error(
-            "Failed to get token with ai.azure.com scope: %s", token_ex
-        )
-    
+
     # Create Azure AI Agent client - SDK handles token acquisition
     chat_client = AzureAIAgentClient(
         async_credential=async_credential,
@@ -137,4 +127,7 @@ async def create_chat_agent_from_foundry(
     agent = ChatAgent(**chat_agent_kwargs)
     return agent, tool_resources
 
-__all__ = ["create_chat_agent_from_foundry", "SUPPORTED_PASSTHROUGH_TOOL_TYPES"]
+__all__ = [
+    "create_chat_agent_from_foundry",
+    "SUPPORTED_PASSTHROUGH_TOOL_TYPES",
+]

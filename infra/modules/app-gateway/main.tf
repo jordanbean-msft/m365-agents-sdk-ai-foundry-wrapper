@@ -20,10 +20,20 @@ resource "azurerm_application_gateway" "main" {
   location            = var.location
   tags                = var.common_tags
 
+  # Temporary workaround: ignore ssl_certificate changes to avoid azurerm provider
+  # inconsistency bug when Key Vault certificate versions rotate mid-apply.
+  # Remove this lifecycle block once provider bug is resolved and a stable
+  # apply succeeds without errors.
+  lifecycle {
+    ignore_changes = [
+      ssl_certificate
+    ]
+  }
+
   sku {
     name     = "WAF_v2"
     tier     = "WAF_v2"
-    capacity = 2
+    capacity = 1
   }
 
   identity {

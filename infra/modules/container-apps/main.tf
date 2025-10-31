@@ -106,6 +106,11 @@ resource "azurerm_container_app" "main" {
         value = var.reset_command_keywords
       }
 
+      env {
+        name  = "ENABLE_RESPONSE_METADATA_CARD"
+        value = var.enable_response_metadata_card ? "true" : "false"
+      }
+
       dynamic "env" {
         for_each = var.application_insights_connection_string != null ? [1] : []
         content {
