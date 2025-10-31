@@ -182,3 +182,9 @@ variable "reset_command_keywords" {
   type        = string
   default     = "reset,restart,new"
 }
+
+variable "enable_response_metadata_card" {
+  description = "Feature flag to enable the metadata adaptive card with timing/token info (default false)"
+  type        = bool
+  default     = false
+}

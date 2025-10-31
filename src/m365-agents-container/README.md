@@ -1,302 +1,415 @@
-# Streaming Agent
+# M365 Agents Container - Azure AI Foundry Wrapper
 
-This is a sample of a simple Agent that is hosted on a Python web service. The sample demonstrates how to stream responses, specifically with streamed OpenAI calls.
+This container wraps Azure AI Foundry agents for use with the Microsoft 365 Agents SDK. It provides a Bot Framework-compatible endpoint that routes messages to AI Foundry agents, with support for streaming responses, conversation management, and adaptive cards.
+
+## What This Does
+
+This application:
+
+- **Wraps Azure AI Foundry agents** in the Microsoft 365 Agents SDK framework
+- **Provides a Bot Framework endpoint** (`/api/messages`) compatible with Azure Bot Service
+- **Streams responses** from AI Foundry agents back to users via adaptive cards
+- **Manages conversation state** with automatic thread creation and reset capabilities
+- **Uses managed identity authentication** for secure access to Azure AI Foundry resources
+- **Supports tool calls** including code_interpreter, file_search, azure_ai_search, bing_grounding, and OpenAPI tools
+- **Provides health check endpoints** for Azure Application Gateway probes
+- **Works across channels** including Microsoft Teams and M365 Copilot Chat
 
 ## Prerequisites
 
-- [Python](https://www.python.org/) version 3.9 or higher
+- [Python](https://www.python.org/) version 3.13 or higher
+- [uv](https://docs.astral.sh/uv/) for dependency management (recommended)
 - [dev tunnel](https://learn.microsoft.com/azure/developer/dev-tunnels/get-started?tabs=windows) (for local development)
-- You will need an Azure OpenAI, with the preferred model of `gpt-4o-mini`.
+- Azure AI Foundry project with a deployed agent
+- Azure Bot Service registration
 
 ## Local Setup
 
-### Configure Azure Bot Service
+### 1. Configure Azure Bot Service
 
 1. [Create an Azure Bot](https://aka.ms/AgentsSDK-CreateBot)
+   - Record the **Application ID** (Client ID)
+   - Record the **Tenant ID**
+   - Create and record a **Client Secret**
 
-   - Record the Application ID, the Tenant ID, and the Client Secret for use below
+### 2. Create Azure AI Foundry Agent
 
-1. Configuring the token connection in the Agent settings
+1. Create an [Azure AI Foundry project](https://ai.azure.com)
+2. Deploy a model (e.g., gpt-4o)
+3. Create an agent in the Agents playground
+4. Record the **Agent ID** and **Project Endpoint**
 
-   1. Open the `env.TEMPLATE` file in the root of the sample project, rename it to `.env` and configure the following values:
-   1. Set the **CONNECTIONS**SERVICE_CONNECTION**SETTINGS\_\_CLIENTID** to the AppId of the bot identity.
-   1. Set the **CONNECTIONS**SERVICE*CONNECTION**SETTINGS\_\_CLIENTSECRET** to the Secret that was created for your identity. \_This is the `Secret Value` shown in the AppRegistration*.
-   1. Set the **CONNECTIONS**SERVICE_CONNECTION**SETTINGS\_\_TENANTID** to the Tenant Id where your application is registered.
+### 3. Configure Environment Variables
 
-1. Configure the Azure OpenAI settings in the Agent settings
+Copy `env.TEMPLATE` to `.env` and configure:
 
-   1. Set **AZURE_OPENAI_API_VERSION** to an OpenAI API version such as ` 2025-01-01-preview`
-   1. Set **AZURE_OPENAI_ENDPOINT** to the endpoint for your Azure OpenAI instance. For example, if using an Azure AI Foundry named `testing`, the endpoint would be `https://endpoint.openai.azure.com/`
+```bash
+# Bot Service Configuration
+CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTID=<your-bot-app-id>
+CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTSECRET=<your-bot-client-secret>
+CONNECTIONS__SERVICE_CONNECTION__SETTINGS__TENANTID=<your-tenant-id>
 
-1. Run `dev tunnels`. See [Create and host a dev tunnel](https://learn.microsoft.com/azure/developer/dev-tunnels/get-started?tabs=windows) and host the tunnel with anonymous user access command as shown below:
+# Azure AI Foundry Configuration
+AZURE_AI_PROJECT_ENDPOINT=<your-ai-foundry-project-endpoint>
+AZURE_AI_FOUNDRY_AGENT_ID=<your-agent-id>
+AZURE_AI_MODEL_DEPLOYMENT_NAME=<model-deployment-name>
+
+# Managed Identity (for Azure deployment only)
+AZURE_CLIENT_ID=<user-assigned-managed-identity-client-id>
+
+# Optional: Application Logging
+LOG_LEVEL=INFO
+PYTHONUNBUFFERED=1
+
+# Optional: Conversation Reset Keywords (comma-separated)
+RESET_COMMAND_KEYWORDS=reset,restart,new
+
+# Optional: Application Insights
+# APPLICATIONINSIGHTS_CONNECTION_STRING=<connection-string>
+```
+
+### 4. Set Up Dev Tunnel (for local development)
+
+1. Create and host a dev tunnel:
 
    ```bash
    devtunnel host -p 3978 --allow-anonymous
    ```
 
-1. Take note of the url shown after `Connect via browser:`
+2. Note the URL shown after `Connect via browser:`
 
-1. On the Azure Bot, select **Settings**, then **Configuration**, and update the **Messaging endpoint** to `{tunnel-url}/api/messages`
+3. Update Azure Bot messaging endpoint:
+   - Go to Azure Portal → Your Bot Resource → Settings → Configuration
+   - Set **Messaging endpoint** to `{tunnel-url}/api/messages`
 
-### Running the Agent
+## Running Locally
 
-1. Open this folder from your IDE or Terminal of preference
-1. (Optional but recommended) Set up virtual environment and activate it.
-1. Install dependencies
+### Option 1: Using uv (Recommended)
 
-```sh
-pip install -r requirements.txt
+```bash
+# Install dependencies
+uv sync --extra dev --prerelease=allow
+
+# Run the application
+uv run python -m src.main
 ```
 
-### Run in localhost, anonymous mode
+### Option 2: Using pip
 
-1. Start the application
+```bash
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-```sh
-python -m src.app   # or: python -m src.app.bootstrap
+# Install dependencies
+pip install -e .
+
+# Run the application
+python -m src.main
 ```
 
-If installed via `pip` (editable or wheel) you can also use the console script:
+You should see output similar to:
 
-```sh
-azureai-foundry-streaming
 ```
-
-You should then see output similar to:
-
-```text
 ======== Running on http://0.0.0.0:3978 ========
+(Press CTRL+C to quit)
 ```
 
-The agent is ready to accept messages.
+The agent is ready to accept messages at `http://localhost:3978/api/messages`.
 
-## Conversation Management (Reset, Timeout & Adaptive Card)
+## Features
 
-This container supports conversation lifecycle controls so users in Microsoft
-Teams (or other Bot Framework channels) can intentionally or automatically
-start fresh.
+### Conversation Management
 
-### Manual Reset
-
-Send one of the reset keywords (case-insensitive, message must ONLY contain
-the keyword) to clear the current conversation state:
+**Manual Reset**: Users can reset their conversation by sending any of the reset keywords:
 
 ```
 reset, restart, new
 ```
 
-After a reset an Adaptive Card is returned with a "Restart Conversation"
-button (it simply re-sends the first reset keyword so behavior stays uniform).
+These keywords are configurable via the `RESET_COMMAND_KEYWORDS` environment variable.
 
-### Inactivity Timeout
+**Thread Persistence**: The application maintains conversation threads in memory, allowing multi-turn conversations with context retention.
 
-Set `CONVERSATION_TIMEOUT_SECONDS` (env var) to a positive integer to enable
-automatic expiration. On the next inbound message AFTER the timeout window:
+**Fresh Credentials**: Each request creates fresh Azure credentials to avoid token expiration issues during long conversations.
 
-1. Prior conversation state (agent, thread, tool resources, timestamps) is cleared.
-2. An Adaptive Card informs the user the session expired.
-3. The current message is processed as the FIRST message of a new session.
+### Response Formatting
 
-Set to `0` (default) to disable.
+Responses are delivered as **Adaptive Cards** with:
 
-### Environment Variables
+- Formatted agent response text
+- Metadata footer showing:
+  - Response time
+  - Thread ID
+  - Agent ID
+  - Run ID
+  - Token usage (total, prompt, completion)
+  - Tool calls made (if any)
 
-| Variable                       | Purpose                                        | Default             |
-| ------------------------------ | ---------------------------------------------- | ------------------- |
-| `RESET_COMMAND_KEYWORDS`       | Comma‑separated list of reset trigger keywords | `reset,restart,new` |
-| `CONVERSATION_TIMEOUT_SECONDS` | Inactivity seconds before auto-reset           | `0` (off)           |
+### Tool Support
 
-### Adaptive Card Customization
+The application automatically passes through the following tool types from AI Foundry agents:
 
-The JSON payload is constructed in `_build_reset_adaptive_card` (see
-`src/api/cards.py`). Modify `build_reset_adaptive_card` there to change wording,
-branding, or add additional actions (e.g., Help, FAQ).
+- `code_interpreter` - Code execution
+- `file_search` - File/document search
+- `azure_ai_search` - Azure AI Search integration
+- `bing_grounding` - Bing grounding
+- `bing_custom_search` - Bing custom search
+- `mcp` - Model Context Protocol
+- `openapi` - OpenAPI/REST API calls
 
-### Notes
+**Note**: Function tools defined in AI Foundry are currently logged but not locally implemented.
 
-- Conversation state is currently in-memory; use a distributed cache (Redis,
-  Cosmos DB, etc.) if you need durability or horizontal scale.
-- Timeout evaluation is lazy (performed only when a new message arrives).
-- Manual resets and timeouts are per-conversation; other conversations are
-  unaffected.
+### Architecture
 
-## Health Check Endpoint
+```
+┌─────────────────┐
+│  Teams/WebChat  │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│   Azure Bot Service     │
+└────────┬────────────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│  Container App/Server   │
+│  (This Application)     │
+│                         │
+│  ┌──────────────────┐   │
+│  │ Bot Framework    │   │
+│  │ Adapter          │   │
+│  └────────┬─────────┘   │
+│           │             │
+│           ▼             │
+│  ┌──────────────────┐   │
+│  │ Agent Handlers   │   │
+│  └────────┬─────────┘   │
+│           │             │
+│           ▼             │
+│  ┌──────────────────┐   │
+│  │ Azure AI Foundry │   │
+│  │ Agent Client     │   │
+│  └────────┬─────────┘   │
+└───────────┼─────────────┘
+            │
+            ▼
+    ┌───────────────────┐
+    │ Azure AI Foundry  │
+    │ Project/Agent     │
+    └───────────────────┘
+```
 
-The container exposes a lightweight unauthenticated liveness endpoint used by the Azure Application Gateway health probe:
+## Endpoints
 
-- Path: `/healthz` (alias `/health`)
-- Method: `GET`
-- Response: `200 OK` with JSON body: `{ "status": "ok", "service": "m365-agents", "time": "<UTC ISO8601>" }`
-- Purpose: Quickly indicate the process is running without invoking downstream services.
+### Bot Framework Endpoint
 
-If you test locally:
+- **Path**: `/api/messages`
+- **Method**: `POST`
+- **Purpose**: Receives messages from Azure Bot Service
+- **Authentication**: Bot Framework JWT validation
+
+### Health Check Endpoints
+
+The container exposes lightweight unauthenticated liveness endpoints for Azure Application Gateway health probes:
+
+- **Paths**: `/healthz` or `/health`
+- **Method**: `GET`
+- **Response**: `200 OK` with JSON:
+  ```json
+  {
+    "status": "ok",
+    "service": "m365-agents",
+    "time": "2025-10-29T12:34:56.789Z"
+  }
+  ```
+
+Test locally:
 
 ```bash
 curl -i http://localhost:3978/healthz
 ```
 
-You should see `HTTP/1.1 200 OK` and the JSON payload.
+> These endpoints bypass authentication for health probe compatibility.
 
-> This endpoint bypasses JWT auth so the Application Gateway probe can succeed.
+## Testing
 
-## Accessing the Agent
+### Using WebChat
 
-### Using the Agent in WebChat
+1. Go to your Azure Bot Service resource in the Azure Portal
+2. Select **Test in WebChat**
+3. Send a message to interact with your AI Foundry agent
 
-1. Go to your Azure Bot Service resource in the Azure Portal and select **Test in WebChat**
+### Using Teams or M365 Copilot
 
-## Deploying to Azure Container Apps
+1. **Teams**: Add your bot to Microsoft Teams via the Teams admin center, then start a chat
+2. **M365 Copilot**: Enable the M365 Extensions channel in Azure Bot Service to use in Copilot Chat
+3. Messages are routed through Azure Bot Service to your container
 
-### 0. (Optional) Set All Common Variables
+> **Note**: This bot does not send welcome messages on connection. Users can start interacting immediately by sending any message.
 
-```bash
-# Set a common suffix for all resources
-SUFFIX="testlaw"  # Change this to your preferred unique suffix
+## Deploying to Azure
 
-# Generate names for Azure resources using the suffix
-RESOURCE_GROUP="rg-$SUFFIX"
-LOCATION="eastus2"  # Change as needed
-LOG_ANALYTICS_NAME="log-$SUFFIX"
-IDENTITY_NAME="id-$SUFFIX"
-ACR_NAME="acr$SUFFIX"  # ACR names must be globally unique and only lowercase letters/numbers
-APP_NAME="app-$SUFFIX"
-CONTAINERAPPS_ENVIRONMENT="cae-$SUFFIX"
-IMAGE_NAME="image-$SUFFIX"
-IMAGE_TAG="v1"  # Change as needed
+### Recommended: Using Terraform
 
-# Set environment variable values as needed
-CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTID=<client-id>
-CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTSECRET=<client-secret>
-CONNECTIONS__SERVICE_CONNECTION__SETTINGS__TENANTID=<tenant-id>
-AZURE_AI_PROJECT_ENDPOINT=<project-endpoint>
-AZURE_AI_FOUNDRY_AGENT_ID=<agent-id>
-AZURE_AI_MODEL_DEPLOYMENT_NAME=<model-deployment-name>
-AZURE_AI_RESOURCE_ID=<AZURE_AI_RESOURCE_ID>
-SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-```
+This repository includes complete Terraform infrastructure in `infra/` that provisions:
 
-### 1. Create Resource Group
+- Azure Container Registry (ACR)
+- Azure Container Apps with VNet integration
+- User-assigned managed identity with proper RBAC
+- Private endpoints and network security groups
+- Key Vault for secrets
+- Application Gateway for ingress
+- AI Foundry project resources
 
-```bash
-az group create --name $RESOURCE_GROUP --location $LOCATION
-```
+**See the [infrastructure README](../../infra/README.md) for complete deployment instructions.**
 
-### 2. Create Log Analytics Workspace
+### Quick Terraform Deployment
 
-```bash
-az monitor log-analytics workspace create \
-   --resource-group $RESOURCE_GROUP \
-   --workspace-name $LOG_ANALYTICS_NAME \
-   --location $LOCATION
+1. **Navigate to infrastructure directory**:
 
-LOG_ANALYTICS_WORKSPACE_ID=$(az monitor log-analytics workspace show \
-   --resource-group $RESOURCE_GROUP \
-   --workspace-name $LOG_ANALYTICS_NAME \
-   --query customerId -o tsv)
-LOG_ANALYTICS_WORKSPACE_KEY=$(az monitor log-analytics workspace get-shared-keys \
-   --resource-group $RESOURCE_GROUP \
-   --workspace-name $LOG_ANALYTICS_NAME \
-   --query primarySharedKey -o tsv)
-```
+   ```bash
+   cd infra
+   ```
 
-### 3. Create User-Assigned Managed Identity
+2. **Configure variables** in `terraform.tfvars`:
 
-```bash
-az identity create \
-   --name $IDENTITY_NAME \
-   --resource-group $RESOURCE_GROUP \
-   --location $LOCATION
+   ```hcl
+   # See terraform.tfvars.example for all required values
+   container_image = "acr<suffix>.azurecr.io/m365-agents:latest"
+   ```
 
-IDENTITY_PRINCIPAL_ID=$(az identity show \
-   --name $IDENTITY_NAME \
-   --resource-group $RESOURCE_GROUP \
-   --query 'principalId' -o tsv)
-IDENTITY_CLIENT_ID=$(az identity show \
-   --name $IDENTITY_NAME \
-   --resource-group $RESOURCE_GROUP \
-   --query 'clientId' -o tsv)
-```
+3. **Deploy**:
 
-### 4. Create Azure Container Registry (ACR)
+   ```bash
+   terraform init
+   terraform plan
+   terraform apply
+   ```
 
-```bash
-az acr create \
-   --resource-group $RESOURCE_GROUP \
-   --name $ACR_NAME \
-   --sku Basic
-```
+4. **Build and push container image**:
 
-### 5. Grant Roles to Managed Identity
+   ```bash
+   # From this directory (src/m365-agents-container)
+   ACR_NAME=$(terraform -chdir=../../infra output -raw acr_login_server)
+
+   # Build for linux/amd64 (required for Azure Container Apps)
+   docker buildx build --platform linux/amd64 \
+     -t $ACR_NAME/m365-agents:latest \
+     --push .
+   ```
+
+5. **Update Container App** with the new image:
+   ```bash
+   cd ../../infra
+   terraform apply -var="container_image=$ACR_NAME/m365-agents:latest"
+   ```
+
+### Manual Azure CLI Deployment
+
+If not using Terraform, you can deploy manually. See the [Container Apps module README](../../infra/modules/container-apps/README.md) for step-by-step Azure CLI instructions.
+
+### Container Image Architecture
+
+**IMPORTANT**: Azure Container Apps runs on `linux/amd64` architecture. If you're building on an ARM-based machine (Apple Silicon, ARM laptops), you MUST specify the platform:
 
 ```bash
-# Grant Azure AI User role
-az role assignment create \
-   --assignee $IDENTITY_PRINCIPAL_ID \
-   --role "Azure AI User" \
-   --scope $AZURE_AI_RESOURCE_ID
+# Using buildx (recommended)
+docker buildx build --platform linux/amd64 -t <image-name> .
 
-# Grant AcrPull role
-ACR_ID=$(az acr show --name $ACR_NAME --resource-group $RESOURCE_GROUP --query id -o tsv)
-az role assignment create \
-   --assignee $IDENTITY_PRINCIPAL_ID \
-   --role "AcrPull" \
-   --scope $ACR_ID
+# Or set default platform
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+docker build -t <image-name> .
 ```
 
-### 6. Login to ACR
+Failure to build for the correct architecture will result in container startup failures.
 
-```bash
-az acr login --name $ACR_NAME
+## Configuration Reference
+
+### Environment Variables
+
+| Variable                                                  | Required | Description                                                  | Default             |
+| --------------------------------------------------------- | -------- | ------------------------------------------------------------ | ------------------- |
+| `CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTID`     | Yes      | Azure Bot Service application (client) ID                    | -                   |
+| `CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTSECRET` | Yes      | Azure Bot Service client secret                              | -                   |
+| `CONNECTIONS__SERVICE_CONNECTION__SETTINGS__TENANTID`     | Yes      | Azure AD tenant ID                                           | -                   |
+| `AZURE_AI_PROJECT_ENDPOINT`                               | Yes      | Azure AI Foundry project endpoint URL                        | -                   |
+| `AZURE_AI_FOUNDRY_AGENT_ID`                               | Yes      | AI Foundry agent ID to use                                   | -                   |
+| `AZURE_AI_MODEL_DEPLOYMENT_NAME`                          | Yes      | Model deployment name (e.g., gpt-4o)                         | -                   |
+| `AZURE_CLIENT_ID`                                         | Yes\*    | User-assigned managed identity client ID (\*Azure only)      | -                   |
+| `LOG_LEVEL`                                               | No       | Python logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) | `INFO`              |
+| `PYTHONUNBUFFERED`                                        | No       | Disable Python output buffering                              | `1`                 |
+| `RESET_COMMAND_KEYWORDS`                                  | No       | Comma-separated list of keywords to reset conversation       | `reset,restart,new` |
+| `ENABLE_RESPONSE_METADATA_CARD`                           | No       | Display metadata card with timing, tokens, thread/run info   | `false`             |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING`                   | No       | Application Insights connection string for telemetry         | -                   |
+
+### Project Structure
+
+```
+src/
+├── main.py                 # Legacy entry point (delegates to app.bootstrap)
+├── agents/
+│   ├── factory.py          # AI Foundry agent creation logic
+│   └── state.py            # Conversation state management
+├── api/
+│   ├── handlers.py         # Bot Framework message handlers
+│   ├── cards.py            # Adaptive card builders
+│   └── streaming.py        # Streaming response utilities
+└── app/
+    ├── bootstrap.py        # Application initialization
+    ├── config.py           # Environment configuration
+    ├── logging.py          # Logging setup
+    └── server.py           # aiohttp server setup
 ```
 
-### 7. Create Azure Container Apps Environment
+## Troubleshooting
 
-```bash
-az containerapp env create \
-   --name $CONTAINERAPPS_ENVIRONMENT \
-   --resource-group $RESOURCE_GROUP \
-   --location $LOCATION \
-   --logs-workspace-id $LOG_ANALYTICS_WORKSPACE_ID \
-   --logs-workspace-key $LOG_ANALYTICS_WORKSPACE_KEY
-```
+### Authentication Issues
 
-### 8. Build and Push the Container Image
+**Problem**: `Failed to get token` or `401 Unauthorized` errors
 
-```bash
-az acr build --registry $ACR_NAME --image $IMAGE_NAME:$IMAGE_TAG .
-```
+**Solutions**:
 
-### 9. Deploy to Azure Container Apps (with Managed Identity)
+- Verify `AZURE_CLIENT_ID` matches the user-assigned managed identity
+- Ensure managed identity has "Azure AI User" role on the AI Foundry project
+- Check that credentials are being refreshed (application creates fresh credentials per request)
 
-```bash
-az containerapp create \
-   --name $APP_NAME \
-   --resource-group $RESOURCE_GROUP \
-   --environment $CONTAINERAPPS_ENVIRONMENT \
-   --image $ACR_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_TAG \
-   --target-port 3978 \
-   --ingress 'external' \
-   --min-replicas 1 \
-   --user-assigned /subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ManagedIdentity/userAssignedIdentities/$IDENTITY_NAME \
-   --registry-server $ACR_NAME.azurecr.io \
-   --registry-identity /subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ManagedIdentity/userAssignedIdentities/$IDENTITY_NAME \
-   --env-vars \
-      CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTID=$CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTID \
-      CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTSECRET=$CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTSECRET \
-      CONNECTIONS__SERVICE_CONNECTION__SETTINGS__TENANTID=$CONNECTIONS__SERVICE_CONNECTION__SETTINGS__TENANTID \
-      AZURE_AI_PROJECT_ENDPOINT=$AZURE_AI_PROJECT_ENDPOINT \
-      AZURE_AI_FOUNDRY_AGENT_ID=$AZURE_AI_FOUNDRY_AGENT_ID \
-      AZURE_AI_MODEL_DEPLOYMENT_NAME=$AZURE_AI_MODEL_DEPLOYMENT_NAME \
-      AZURE_CLIENT_ID=$IDENTITY_CLIENT_ID
-```
+### Agent Not Found
 
-> **Note:**
->
-> - Make sure your Container App has access to the Azure resources it needs (e.g., via a managed identity or network rules).
-> - Update the port if your app listens on a different port.
+**Problem**: `Failed fetch Foundry agent` warnings
 
-## Further reading
+**Solutions**:
 
-To learn more about building Agents, see our [Microsoft 365 Agents SDK](https://github.com/microsoft/agents) repo.
+- Verify `AZURE_AI_FOUNDRY_AGENT_ID` is correct
+- Ensure `AZURE_AI_PROJECT_ENDPOINT` matches your AI Foundry project
+- Check that the agent exists in the AI Foundry portal
 
-For more information on logging configuration, see the logging section in the Quickstart Agent sample README.
+### Container Startup Failures
+
+**Problem**: Container app revision fails to start
+
+**Solutions**:
+
+- Verify image was built for `linux/amd64` architecture
+- Check environment variables are set correctly in Container App configuration
+- Review container logs in Azure Portal → Container App → Revision Management → Logs
+
+### No Response from Agent
+
+**Problem**: Messages sent but no response received
+
+**Solutions**:
+
+- Check bot messaging endpoint is configured correctly in Azure Bot Service
+- Verify dev tunnel is running (for local development)
+- Review application logs for errors
+- Test health endpoint: `curl http://localhost:3978/healthz`
+
+## Further Reading
+
+- [Microsoft 365 Agents SDK](https://github.com/microsoft/agents)
+- [Azure AI Foundry Documentation](https://learn.microsoft.com/azure/ai-studio/)
+- [Azure Container Apps Documentation](https://learn.microsoft.com/azure/container-apps/)
+- [Azure Bot Service Documentation](https://learn.microsoft.com/azure/bot-service/)
+- [Adaptive Cards Documentation](https://adaptivecards.io/)

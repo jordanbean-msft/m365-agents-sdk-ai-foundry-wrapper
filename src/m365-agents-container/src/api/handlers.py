@@ -1,6 +1,7 @@
 """Bot activity handlers (refactored from legacy agent.py)."""
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
@@ -13,32 +14,19 @@ from microsoft_agents.hosting.core import TurnContext, TurnState
 from ..agents import (conversation_threads, conversation_tool_resources,
                       create_chat_agent_from_foundry, reset_conversation)
 from ..app.config import (AGENT_APP, AZURE_AI_FOUNDRY_AGENT_ID,
-                          AZURE_AI_PROJECT_ENDPOINT, RESET_COMMAND_KEYWORDS)
+                          AZURE_AI_PROJECT_ENDPOINT,
+                          ENABLE_RESPONSE_METADATA_CARD,
+                          RESET_COMMAND_KEYWORDS)
 from .cards import build_response_adaptive_card
-from .streaming import queue_status_update
+from .streaming import finalize_stream_with_card, queue_informative, queue_text
 
 logger = logging.getLogger(__name__)
 
 
-@AGENT_APP.conversation_update("membersAdded")
-async def on_members_added(context: TurnContext, state: TurnState):  # noqa: ARG001
-    conversation_id = context.activity.conversation.id
-    user_id = (
-        context.activity.from_property.id if context.activity.from_property else "unknown"
-    )
-    logger.info(
-        "New connection established - Conversation ID: %s, User ID: %s, Activity ID: %s",
-        conversation_id,
-        user_id,
-        context.activity.id,
-    )
-    await context.send_activity(
-        "Welcome to the Azure AI Foundry streaming sample. Ask any question and I'll stream the answer!"
-    )
-
-
 @AGENT_APP.activity("invoke")
-async def invoke(context: TurnContext, state: TurnState):  # noqa: ARG001
+async def invoke(
+    context: TurnContext, state: TurnState
+):  # noqa: ARG001
     sender = getattr(context.activity, "from_property", None) or getattr(
         context.activity, "recipient", None
     )
@@ -59,37 +47,59 @@ async def invoke(context: TurnContext, state: TurnState):  # noqa: ARG001
 
 
 @AGENT_APP.message(re.compile(r".+"))
-async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG001
+async def on_user_message(
+    context: TurnContext, state: TurnState
+):  # noqa: ARG001
     if not AZURE_AI_PROJECT_ENDPOINT or not AZURE_AI_FOUNDRY_AGENT_ID:
         await context.send_activity(
-            "Azure AI Agent client or agent ID not configured. Please check your environment variables."
+            (
+                "Azure AI Agent client or agent ID not configured. "
+                "Please check your environment variables."
+            )
         )
         return
 
     try:
         conversation_id = context.activity.conversation.id
         user_id = (
-            context.activity.from_property.id if context.activity.from_property else "unknown"
+            context.activity.from_property.id
+            if context.activity.from_property
+            else "unknown"
         )
         activity_id = context.activity.id
-        user_content = context.activity.text.strip() if context.activity.text else ""
+        user_content = (
+            context.activity.text.strip() if context.activity.text else ""
+        )
 
+        truncated_msg = (
+            user_content[:100] + "..."
+            if len(user_content) > 100
+            else user_content
+        )
         logger.info(
-            "Message received - Conversation ID: %s, User ID: %s, Activity ID: %s, Message: '%s'",
+            (
+                "Message received - Conversation ID: %s, User ID: %s, "
+                "Activity ID: %s, Message: '%s'"
+            ),
             conversation_id,
             user_id,
             activity_id,
-            (user_content[:100] + "..." if len(user_content) > 100 else user_content),
+            truncated_msg,
         )
         if not user_content:
-            await context.send_activity("Please enter a question to receive an answer.")
+            await context.send_activity(
+                "Please enter a question to receive an answer."
+            )
             return
 
         lowered = user_content.lower()
         if lowered in RESET_COMMAND_KEYWORDS:
             reset_conversation(conversation_id)
             await context.send_activity(
-                "Conversation reset! Welcome back. Ask me anything to get started."
+                (
+                    "Conversation reset! Welcome back. Ask me anything to "
+                    "get started."
+                )
             )
             return
 
@@ -98,6 +108,7 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
         # Create fresh credential instance per request to ensure
         # tokens are not cached and can be refreshed.
         fresh_credential = DefaultAzureCredential()
+
         agent, tool_resources = await create_chat_agent_from_foundry(
             project_endpoint=AZURE_AI_PROJECT_ENDPOINT,
             agent_id=AZURE_AI_FOUNDRY_AGENT_ID,
@@ -135,52 +146,41 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
             run_kwargs["tool_resources"] = tool_res
 
         logger.info(
-            "Starting agent run_stream - Conversation ID: %s, Thread ID: %s, Agent ID: %s",
+            (
+                "Starting agent run_stream - Conversation ID: %s, "
+                "Thread ID: %s, Agent ID: %s"
+            ),
             conversation_id,
             thread_id,
             AZURE_AI_FOUNDRY_AGENT_ID,
         )
 
-        # If streaming is enabled we suppress textual token streaming to avoid duplicate
-        # final content (user wants only the adaptive card). We monkey patch queue_text_chunk
-        # and queueTextChunk to no-op while leaving informative updates intact.
-        if hasattr(context, "streaming_response") and context.streaming_response:
-            sr = context.streaming_response
-            for attr in ["queue_text_chunk", "queueTextChunk"]:
-                if hasattr(sr, attr):
-                    original = getattr(sr, attr)
-                    if callable(original):
-                        try:
-                            setattr(sr, attr, lambda *a, **kw: None)
-                            logger.debug("Suppressed streaming text via monkey patch: %s", attr)
-                        except Exception as patch_exc:  # noqa: BLE001
-                            logger.debug("Failed monkey patching %s: %s", attr, patch_exc)
+        # Initial informative update if streaming available
+        queue_informative(context, "Starting agent run...")
 
         start_time = time.time()
         chunk_count = 0
         run_id = None
-        full_response: List[str] = []
+        code_blocks: List[Dict[str, Any]] = []
+        images: List[Dict[str, Any]] = []
         total_tokens: Optional[int] = None
         prompt_tokens: Optional[int] = None
         completion_tokens: Optional[int] = None
-        tool_calls: List[str] = []
 
-        queue_status_update(context, "Starting agent run...")
+        # (Already queued above before entering try loop)
 
         try:
-            async for chunk in agent.run_stream(user_content, thread=thread, **run_kwargs):
-                chunk_type = type(chunk).__name__
-                logger.debug(
-                    "Chunk %d type: %s, has contents: %s",
-                    chunk_count + 1,
-                    chunk_type,
-                    hasattr(chunk, "contents") and chunk.contents is not None,
-                )
+            # Run the agent stream
+            async for chunk in agent.run_stream(
+                user_content, thread=thread, **run_kwargs
+            ):
+                # Increment chunk count for received update
+                chunk_count += 1
 
                 if run_id is None and getattr(chunk, "response_id", None):
                     run_id = chunk.response_id
                     logger.info(
-                        "Agent run started - Conversation ID: %s, Thread ID: %s, Run ID: %s",
+                        "Run started - ConvID:%s Thread:%s Run:%s",
                         conversation_id,
                         thread_id,
                         run_id,
@@ -189,11 +189,33 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
                 if hasattr(chunk, "contents") and chunk.contents:
                     for content in chunk.contents:
                         ctype = type(content).__name__
-                        logger.debug("Content type: %s", ctype)
-                        if ctype == "UsageContent":
+
+                        # Handle code content (from code_interpreter)
+                        if "Code" in ctype:
+                            code_text = getattr(
+                                content, "code", None
+                            ) or getattr(content, "text", None)
+                            if code_text:
+                                code_blocks.append(
+                                    {"code": code_text, "type": ctype}
+                                )
+                                logger.info("Code block detected: %s", ctype)
+
+                        # Handle image content
+                        elif "Image" in ctype or "ImageFile" in ctype:
+                            image_file_id = getattr(content, "file_id", None)
+                            if image_file_id:
+                                images.append(
+                                    {"file_id": image_file_id, "type": ctype}
+                                )
+                                logger.info(
+                                    "Image detected: file_id=%s", image_file_id
+                                )
+
+                        elif ctype == "UsageContent":
                             # Extract token counts from details object
                             if hasattr(content, "details"):
-                                details = content.details
+                                details = getattr(content, "details", None)
                                 extracted_map = {
                                     "total_tokens": getattr(
                                         details, "total_token_count", None
@@ -238,15 +260,27 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
                                     total_tokens = (
                                         prompt_tokens + completion_tokens
                                     )
-                        if "Tool" in ctype or "Function" in ctype:
-                            tool_name = getattr(content, "name", str(content))
-                            if tool_name and tool_name not in tool_calls:
-                                tool_calls.append(tool_name)
-                                logger.info("Tool call detected: %s", tool_name)
-                                queue_status_update(context, f"Using tool: {tool_name}...")
                 if getattr(chunk, "text", None):
-                    chunk_count += 1
-                    full_response.append(chunk.text)
+                    # Stream text immediately (don't collect for card)
+                    queue_text(context, chunk.text)
+        except json.JSONDecodeError as json_error:
+            logger.error(
+                (
+                    "JSON decode error (likely 408 timeout from AI Foundry) - "
+                    "Conversation ID: %s, Error: %s"
+                ),
+                conversation_id,
+                json_error,
+                exc_info=True,
+            )
+            await context.send_activity(
+                (
+                    "The request timed out while waiting for the agent to "
+                    "respond. This may be due to a long-running operation. "
+                    "Please try again with a simpler query."
+                )
+            )
+            return
         except Exception as stream_error:  # noqa: BLE001
             logger.error(
                 "Error during agent run - Conversation ID: %s, Error: %s",
@@ -255,7 +289,10 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
                 exc_info=True,
             )
             await context.send_activity(
-                "An error occurred while generating the response. Please try again."
+                (
+                    "An error occurred while generating the response. "
+                    "Please try again."
+                )
             )
             return
 
@@ -265,7 +302,10 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
             logger.info("Extracted thread.service_thread_id: %s", thread_id)
 
         logger.info(
-            "Agent run completed - Conversation ID: %s, Thread ID: %s, Run ID: %s, Chunks: %d, Response Time: %.0f ms, Tokens: %s",
+            (
+                "Agent run completed - Conversation ID: %s, Thread ID: %s, "
+                "Run ID: %s, Chunks: %d, Response Time: %.0f ms, Tokens: %s"
+            ),
             conversation_id,
             thread_id,
             run_id or "unknown",
@@ -276,60 +316,40 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
 
         logger.debug("Formatting final response payload")
 
-        if full_response:
-            response_text = "".join(full_response)
-
-            # Log token information for debugging
-            logger.info(
-                "Token usage - Total: %s, Prompt: %s, Completion: %s",
-                total_tokens,
-                prompt_tokens,
-                completion_tokens,
+        # Only send adaptive card if there's non-text content to display
+        if code_blocks or images:
+            metadata = None
+            if ENABLE_RESPONSE_METADATA_CARD:
+                metadata = {
+                    "response_time_ms": response_time_ms,
+                    "thread_id": thread_id,
+                    "agent_id": AZURE_AI_FOUNDRY_AGENT_ID,
+                    "run_id": run_id,
+                    "total_tokens": total_tokens,
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                }
+            else:
+                logger.debug(
+                    "Metadata card feature disabled; omitting metadata section"
+                )
+            # Pass empty string for text since it was already streamed
+            card_dict = build_response_adaptive_card(
+                "", metadata, code_blocks, images
             )
+            # Attempt streaming finalize with helper; fallback if unsuccessful.
+            streamed = await finalize_stream_with_card(context, card_dict)
+            if streamed:
+                return
 
-            metadata = {
-                "response_time_ms": response_time_ms,
-                "thread_id": thread_id,
-                "agent_id": AZURE_AI_FOUNDRY_AGENT_ID,
-                "run_id": run_id,
-                "total_tokens": total_tokens,
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-                "tool_calls": tool_calls if tool_calls else None,
-            }
-            card_dict = build_response_adaptive_card(response_text, metadata)
+            # Fallback: send adaptive card as normal activity.
             card_attachment = Attachment(
                 content_type="application/vnd.microsoft.card.adaptive",
                 content=card_dict["attachments"][0]["content"],
             )
-
-            # Preferred path: use streaming completion so initial status messages clear.
-            # Per Microsoft docs: Only set attachments, do NOT set any final text to avoid placeholder.
-            # The SDK will send the card-only message when end_stream() is called.
-            if hasattr(context, "streaming_response") and context.streaming_response:
-                sr = context.streaming_response
-                # Attach adaptive card (only allowed on final chunk per docs)
-                try:
-                    sr.set_attachments([card_attachment])
-                except Exception as exc:  # noqa: BLE001
-                    logger.debug("Failed to set attachments on streaming_response: %s", exc)
-                # Enable feedback loop labeling
-                try:
-                    sr.set_feedback_loop(True)
-                    sr.set_feedback_loop_type("custom")
-                except Exception as exc:  # noqa: BLE001
-                    logger.debug("Failed to set feedback loop properties: %s", exc)
-                # End the stream (sends final message with card only, no text). If this fails fall back to normal activity send.
-                try:
-                    await sr.end_stream()
-                    return
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning(
-                        "Streaming end failed; falling back to normal activity delivery: %s", exc)
-            # Fallback: send final adaptive card as normal activity
-            sender_final = getattr(context.activity, "from_property", None) or getattr(
-                context.activity, "recipient", None
-            )
+            sender_final = getattr(
+                context.activity, "from_property", None
+            ) or getattr(context.activity, "recipient", None)
             final_activity = Activity(
                 **{
                     "type": ActivityTypes.message,
@@ -348,18 +368,95 @@ async def on_user_message(context: TurnContext, state: TurnState):  # noqa: ARG0
             )
             await context.send_activity(final_activity)
         else:
-            await context.send_activity(
-                "I received your message but didn't generate a response. "
-                "Please try again."
-            )
+            # Text already streamed; optional metadata card.
+            if ENABLE_RESPONSE_METADATA_CARD:
+                logger.debug(
+                    "Building metadata card (flag enabled, no code/images)"
+                )
+                metadata = {
+                    "agent_id": AZURE_AI_FOUNDRY_AGENT_ID,
+                    "thread_id": thread_id,
+                    "run_id": run_id,
+                    "response_time_ms": response_time_ms,
+                    "total_tokens": total_tokens,
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                }
+                logger.debug(
+                    (
+                        "Metrics rt=%s tot=%s prm=%s cmp=%s "
+                        "thread=%s run=%s"
+                    ),
+                    response_time_ms,
+                    total_tokens,
+                    prompt_tokens,
+                    completion_tokens,
+                    thread_id,
+                    run_id,
+                )
+                card_dict = build_response_adaptive_card(
+                    markdown_text=None,
+                    metadata=metadata,
+                    code_blocks=None,
+                    images=None,
+                )
+                adaptive_content = card_dict["attachments"][0]["content"]
+                body_count = (
+                    len(adaptive_content.get("body", []))
+                    if isinstance(adaptive_content, dict)
+                    else "unknown"
+                )
+                logger.debug(
+                    "Metadata card body elements count: %s",
+                    body_count,
+                )
+                card_attachment = Attachment(
+                    content_type="application/vnd.microsoft.card.adaptive",
+                    content=adaptive_content,
+                )
+                sr = getattr(context, "streaming_response", None)
+                if sr:
+                    try:
+                        sr.set_attachments([card_attachment])
+                        await sr.end_stream()
+                        logger.debug("Stream ended with metadata card")
+                    except (RuntimeError, OSError, ValueError) as exc:
+                        logger.debug("Failed to end stream: %s", exc)
+                else:
+                    sender_final = getattr(
+                        context.activity, "from_property", None
+                    ) or getattr(context.activity, "recipient", None)
+                    await context.send_activity(
+                        Activity(
+                            **{
+                                "type": ActivityTypes.message,
+                                "attachments": [card_attachment],
+                                **(
+                                    {"from": sender_final}
+                                    if sender_final
+                                    else {}
+                                ),
+                            }
+                        )
+                    )
+            else:
+                logger.debug("Metadata card disabled; ending stream")
+                sr = getattr(context, "streaming_response", None)
+                if sr:
+                    try:
+                        await sr.end_stream()
+                    except (RuntimeError, OSError, ValueError) as exc:
+                        logger.debug(
+                            "Failed to end stream (no metadata): %s", exc
+                        )
+
     except Exception as exc:  # noqa: BLE001
         logger.error(
-            "Error during Agent Framework - Conversation ID: %s, Error: %s",
-            context.activity.conversation.id,
-            exc,
-            exc_info=True,
+            "Unhandled error in on_user_message: %s", exc, exc_info=True
         )
-        await context.send_activity(
-            "An error occurred while generating the answer. "
-            "Please try again later."
-        )
+        try:
+            await context.send_activity(
+                "An unexpected error occurred. Please try again."
+            )
+        except Exception:  # noqa: BLE001
+            logger.debug("Failed to send error activity")

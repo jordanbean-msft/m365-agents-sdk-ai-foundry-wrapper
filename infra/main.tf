@@ -303,6 +303,7 @@ module "container_apps" {
   enable_diagnostics                     = var.enable_diagnostics
   log_level                              = var.log_level
   reset_command_keywords                 = var.reset_command_keywords
+  enable_response_metadata_card          = var.enable_response_metadata_card
 }
 
 

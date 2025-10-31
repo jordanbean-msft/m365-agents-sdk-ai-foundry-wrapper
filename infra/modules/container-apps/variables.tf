@@ -111,3 +111,9 @@ variable "reset_command_keywords" {
   type        = string
   default     = "reset,restart,new"
 }
+
+variable "enable_response_metadata_card" {
+  description = "Feature flag: when true, container streams an additional metadata adaptive card after responses"
+  type        = bool
+  default     = false
+}
