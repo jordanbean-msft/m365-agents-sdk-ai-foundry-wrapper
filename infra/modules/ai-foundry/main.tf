@@ -72,9 +72,10 @@ resource "azurerm_cognitive_deployment" "aifoundry_deployment_gpt_4o" {
 }
 
 ## Create the AI Foundry account-level connection to Application Insights (if provided)
+## Note: Resource always created but skipped internally if application_insights_id is null
 ##
 resource "azapi_resource" "conn_app_insights" {
-  count                     = var.application_insights_id != null ? 1 : 0
+  count                     = var.application_insights_id != null && var.application_insights_id != "" ? 1 : 0
   type                      = "Microsoft.CognitiveServices/accounts/connections@2025-06-01"
   name                      = element(split("/", var.application_insights_id), length(split("/", var.application_insights_id)) - 1)
   parent_id                 = azapi_resource.ai_foundry.id

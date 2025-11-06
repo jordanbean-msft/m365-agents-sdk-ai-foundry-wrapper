@@ -43,3 +43,20 @@ output "app_gateway_name" {
   description = "Name of the Application Gateway"
   value       = module.app_gateway.application_gateway_name
 }
+
+## Observability outputs (expose effective IDs whether created or existing)
+output "log_analytics_workspace_id" {
+  description = "Log Analytics workspace ID (either existing or newly created)"
+  value       = local.effective_log_analytics_workspace_id
+}
+
+output "application_insights_id" {
+  description = "Application Insights component ID (either existing or newly created)"
+  value       = local.effective_application_insights_id
+}
+
+output "application_insights_connection_string" {
+  description = "Application Insights connection string"
+  value       = local.effective_application_insights_connection_string
+  sensitive   = true
+}

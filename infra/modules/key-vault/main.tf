@@ -52,9 +52,10 @@ resource "azurerm_private_endpoint" "kv" {
 }
 
 ## Diagnostic settings for Key Vault
+## Note: Resource always created but skipped internally if log_analytics_workspace_id is null or diagnostics disabled
 ##
 resource "azurerm_monitor_diagnostic_setting" "kv" {
-  count                      = var.enable_diagnostics && var.log_analytics_workspace_id != null ? 1 : 0
+  count                      = var.enable_diagnostics && var.log_analytics_workspace_id != null && var.log_analytics_workspace_id != "" ? 1 : 0
   name                       = "${azurerm_key_vault.main.name}-diag"
   target_resource_id         = azurerm_key_vault.main.id
   log_analytics_workspace_id = var.log_analytics_workspace_id

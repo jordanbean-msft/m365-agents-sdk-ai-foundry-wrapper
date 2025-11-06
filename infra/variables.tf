@@ -68,12 +68,13 @@ variable "container_image" {
 }
 
 variable "log_analytics_workspace_id" {
-  description = "Resource ID of an existing Log Analytics Workspace to attach supported services to (e.g. /subscriptions/xxxx/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/my-law)"
+  description = "(Optional) Resource ID of an existing Log Analytics Workspace to attach supported services to. If null, a new workspace will be provisioned automatically. Example: /subscriptions/xxxx/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/my-law"
   type        = string
+  default     = null
 }
 
 variable "application_insights_id" {
-  description = "Resource ID of an existing Application Insights resource to create connections to (optional). Connection string will be fetched automatically. Example: /subscriptions/xxxx/resourceGroups/rg/providers/Microsoft.Insights/components/appinsights"
+  description = "(Optional) Resource ID of an existing Application Insights component. If null, a new component will be provisioned and linked to Log Analytics. Connection string, instrumentation key, and app id will be surfaced automatically. Example: /subscriptions/xxxx/resourceGroups/rg/providers/Microsoft.Insights/components/my-appi"
   type        = string
   default     = null
 }
@@ -187,4 +188,22 @@ variable "enable_response_metadata_card" {
   description = "Feature flag to enable the metadata adaptive card with timing/token info (default false)"
   type        = bool
   default     = false
+}
+
+variable "enable_otel" {
+  description = "Enable OpenTelemetry in the container (passed as ENABLE_OTEL env var). When true and/or Application Insights connection string is present, telemetry bootstrap runs."
+  type        = bool
+  default     = false
+}
+
+variable "enable_sensitive_data" {
+  description = "Enable logging of sensitive data in Application Insights (use only for debugging; default false for production security)"
+  type        = bool
+  default     = false
+}
+
+variable "otel_resource_attributes" {
+  description = "Optional OTEL_RESOURCE_ATTRIBUTES value (e.g. service.name=m365-agents-container,service.version=v1). Null disables env var."
+  type        = string
+  default     = null
 }
