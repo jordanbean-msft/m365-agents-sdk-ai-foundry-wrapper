@@ -369,4 +369,5 @@ terraform.tfvars
 
 .appPackage/
 
+# Local environment files at any directory level
 .env
